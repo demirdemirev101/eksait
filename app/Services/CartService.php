@@ -1,0 +1,174 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Cart;
+use App\Models\Product;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
+
+class CartService
+{
+    protected Cart $cart;
+    protected ?string $sessionId;
+
+    /**
+     * Accept an explicit session ID (passed from the controller via the query param).
+     * Falls back to the Laravel session ID for web requests that don't send one.
+     */
+    public function __construct(?string $sessionId = null)
+    {
+        $this->sessionId = $sessionId ?: (Session::get('cart_session_id') ?: Session::getId());
+        $this->cart = $this->resolveCart();
+    }
+
+    protected function resolveCart(): Cart
+    {
+        if (Auth::check()) {
+            return Cart::firstOrCreate(['user_id' => Auth::id()]);
+        }
+
+        return Cart::firstOrCreate(['session_id' => $this->sessionId]);
+    }
+
+    public function add(Product $product, int $quantity = 1): void
+    {
+        DB::transaction(function () use ($product, $quantity) {
+            $item = $this->cart->items()
+                ->where('product_id', $product->id)
+                ->first();
+
+            $price = $product->sale_price ?? $product->price;
+
+            if ($item) {
+                $item->quantity += $quantity;
+                $item->total    = $item->quantity * $price;
+                $item->save();
+            } else {
+                $this->cart->items()->create([
+                    'product_id' => $product->id,
+                    'quantity'   => $quantity,
+                    'price'      => $price,
+                    'total'      => $quantity * $price,
+                ]);
+            }
+        });
+    }
+
+    public function update(Product $product, int $quantity): void
+    {
+        if ($quantity < 1) {
+            throw ValidationException::withMessages([
+                'quantity' => 'The quantity must be at least 1.',
+            ]);
+        }
+
+        $price = $product->sale_price ?? $product->price;
+
+        $this->cart->items()
+            ->where('product_id', $product->id)
+            ->update([
+                'quantity' => $quantity,
+                'total'    => $quantity * $price,
+            ]);
+    }
+
+    public function remove(Product $product): void
+    {
+        $this->cart->items()
+            ->where('product_id', $product->id)
+            ->delete();
+    }
+
+    public function items()
+    {
+        return $this->cart->items()->with('product')->get();
+    }
+
+    public function clear(): void
+    {
+        $this->cart->items()->delete();
+    }
+
+    public function subtotal(): float
+    {
+        return (float) $this->cart->items()->sum('total');
+    }
+
+    public function cart(): Cart
+    {
+        return $this->cart;
+    }
+
+    public function getSessionId(): string
+    {
+        return $this->sessionId;
+    }
+
+    /**
+     * Merge a guest cart into the authenticated user's cart on login.
+     * Call this after Auth::login() in your LoginController.
+     */
+    public function mergeGuestCartToUser(): void
+    {
+        if (!Auth::check()) {
+            Log::warning('Guest cart merge skipped because no user is authenticated', [
+                'session_id' => $this->sessionId,
+            ]);
+            return;
+        }
+
+        $guestCart = Cart::where('session_id', $this->sessionId)->first();
+        $userCart  = Cart::where('user_id', Auth::id())->first();
+
+        if (!$guestCart) {
+            Log::info('Guest cart merge skipped because guest cart was not found', [
+                'session_id' => $this->sessionId,
+                'user_id' => Auth::id(),
+            ]);
+            return;
+        }
+
+        DB::transaction(function () use ($guestCart, $userCart) {
+            if (!$userCart) {
+                $guestCart->update([
+                    'user_id'    => Auth::id(),
+                    'session_id' => null,
+                ]);
+                return;
+            }
+
+            foreach ($guestCart->items as $guestItem) {
+                $userItem = $userCart->items()
+                    ->where('product_id', $guestItem->product_id)
+                    ->first();
+
+                if ($userItem) {
+                    $userItem->quantity += $guestItem->quantity;
+                    $userItem->total     = $userItem->quantity * $userItem->price;
+                    $userItem->save();
+                } else {
+                    $userCart->items()->create([
+                        'product_id' => $guestItem->product_id,
+                        'quantity'   => $guestItem->quantity,
+                        'price'      => $guestItem->price,
+                        'total'      => $guestItem->total,
+                    ]);
+                }
+            }
+
+            $guestCart->items()->delete();
+            $guestCart->delete();
+        });
+
+        Log::info("Merged guest cart (session_id: {$this->sessionId}) into user cart (user_id: " . Auth::id() . ")");
+    }
+
+    public function hasGuestCart(): bool
+    {
+        return Cart::where('session_id', $this->sessionId)->exists();
+    }
+}
