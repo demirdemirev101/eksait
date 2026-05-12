@@ -1,12 +1,16 @@
-<x-mail::message>
-# Introduction
+@extends('emails.layout')
 
-The body of your message.
+@section('title', 'Грешка при пратка')
 
-<x-mail::button :url="''">
-Button Text
-</x-mail::button>
+@section('hero')
+    <strong>Възникна проблем при създаване или обработка на пратка.</strong><br>
+    Необходима е проверка от администратор.
+@endsection
 
-Thanks,<br>
-{{ config('app.name') }}
-</x-mail::message>
+@section('content')
+    <div class="section-title">Действие</div>
+
+    <div class="info-box">
+        Моля, проверете логовете, настройките на доставчика и състоянието на съответната поръчка в административния панел.
+    </div>
+@endsection

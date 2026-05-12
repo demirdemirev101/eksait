@@ -1,32 +1,46 @@
-<h2>Заявено връщане на поръчка</h2>
+@extends('emails.layout')
 
-<p>Здравей, {{ $order->customer_name }},</p>
+@section('title', 'Заявено връщане на поръчка')
 
-<p>
-    Получихме заявка за връщане на поръчка
-    <strong>#{{ $order->id }}</strong>.
-</p>
+@section('hero')
+    <strong>Здравей, {{ $order->customer_name }}.</strong><br>
+    Получихме заявка за връщане на поръчка <strong>#{{ $order->id }}</strong>.
+@endsection
 
-<hr>
+@section('content')
+    <div class="section-title">Поръчани продукти</div>
 
-<h3>📦 Поръчани продукти</h3>
+    <table class="items-table" role="presentation">
+        <thead>
+            <tr>
+                <th>Продукт</th>
+                <th style="text-align: right;">Сума</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($order->items as $item)
+                <tr>
+                    <td>
+                        <div class="item-name">{{ $item->product_name }}</div>
+                        <div class="item-meta">{{ $item->quantity }} бр. x {{ number_format($item->price, 2) }} €</div>
+                    </td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        {{ number_format($item->total, 2) }} €<br>
+                        <span class="muted">{{ number_format($item->total * 1.9558, 2) }} лв.</span>
+                    </td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
 
-<ul>
-    @foreach($order->items as $item)
-        <li>{{ $item->product_name }} x {{ $item->quantity }}</li>
-        <li>{{ number_format($item->total, 2) }} € / {{ number_format($item->total*1.9558, 2) }} лв.</li>
-    @endforeach
-</ul>
+    <table class="totals-table" role="presentation">
+        <tr class="total-row">
+            <td>Общо</td>
+            <td style="text-align: right;">{{ number_format($order->total, 2) }} €<br><span class="muted">{{ number_format($order->total * 1.9558, 2) }} лв.</span></td>
+        </tr>
+    </table>
 
-<hr>
-
-<p><strong>Общо:</strong> {{ number_format($order->total, 2) }} € / {{ number_format($order->total*1.9558, 2) }} лв.</p>
-
-<hr>
-
-<p>Ще се свържем с теб с инструкции за връщането.</p>
-
-<p>
-    Поздрави,<br>
-    <strong>Freshwater.bg</strong>
-</p>
+    <p style="margin: 0; color: #555555; font-size: 14px; line-height: 1.7;">
+        Ще се свържем с теб с инструкции за връщането.
+    </p>
+@endsection

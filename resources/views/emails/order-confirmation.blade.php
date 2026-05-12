@@ -1,49 +1,85 @@
-<h2>Благодарим за поръчката!</h2>
+@extends('emails.layout')
 
-<p>Здравей, {{ $order->customer_name }},</p>
+@section('title', 'Потвърждение на поръчка')
 
-<p>
-    Получихме твоята поръчка с номер
-    <strong>#{{ $order->id }}</strong>.
-</p>
+@section('hero')
+    <strong>Благодарим за поръчката, {{ $order->customer_name }}!</strong><br>
+    Получихме твоята поръчка <strong>#{{ $order->id }}</strong> и ще я обработим възможно най-скоро.
+@endsection
 
-<hr>
+@section('content')
+    <div class="section-title">Поръчани продукти</div>
 
-<h3>📦 Поръчани продукти</h3>
+    <table class="items-table" role="presentation">
+        <thead>
+            <tr>
+                <th>Продукт</th>
+                <th style="text-align: right;">Сума</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($order->items as $item)
+                <tr>
+                    <td>
+                        <div class="item-name">{{ $item->product_name }}</div>
+                        <div class="item-meta">{{ $item->quantity }} бр. x {{ number_format($item->price, 2) }} €</div>
+                    </td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        {{ number_format($item->total, 2) }} €<br>
+                        <span class="muted">{{ number_format($item->total * 1.9558, 2) }} лв.</span>
+                    </td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
 
-<ul>
-    @foreach($order->items as $item)
-        <li>{{ $item->product_name }} x {{ $item->quantity }}</li>
-        <li>{{ number_format($item->total, 2) }} € / {{ number_format($item->total*1.9558, 2) }} лв.</li>
-    @endforeach
-</ul>
+    <table class="totals-table" role="presentation">
+        <tr class="first-row">
+            <td>Продукти</td>
+            <td style="text-align: right;">
+                {{ number_format($order->subtotal, 2) }} €<br>
+                <span class="muted">{{ number_format($order->subtotal * 1.9558, 2) }} лв.</span>
+            </td>
+        </tr>
+        <tr>
+            <td>Доставка</td>
+            <td style="text-align: right;">
+                {{ number_format($order->shipping_price, 2) }} €<br>
+                <span class="muted">{{ number_format($order->shipping_price * 1.9558, 2) }} лв.</span>
+            </td>
+        </tr>
+        <tr class="total-row">
+            <td>Общо</td>
+            <td style="text-align: right;">
+                {{ number_format($order->total, 2) }} €<br>
+                <span class="muted">{{ number_format($order->total * 1.9558, 2) }} лв.</span>
+            </td>
+        </tr>
+    </table>
 
-<hr>
+    @if ($order->payment_method === 'bank_transfer')
+        <div class="section-title">Банков превод</div>
+        <table class="dark-box" role="presentation">
+            <tr><td colspan="2" class="dark-title">Данни за плащане</td></tr>
+            <tr><td class="dark-label">Получател</td><td>{{ config('services.bank_transfer.company_name') }}</td></tr>
+            <tr><td class="dark-label">IBAN</td><td>{{ config('services.bank_transfer.iban') }}</td></tr>
+            <tr><td class="dark-label">Банка</td><td>{{ config('services.bank_transfer.bank_name') }}</td></tr>
+            <tr><td class="dark-label">BIC</td><td>{{ config('services.bank_transfer.bic') }}</td></tr>
+            <tr><td class="dark-label">Сума</td><td>{{ number_format($order->total, 2) }} {{ config('services.bank_transfer.currency') }} / {{ number_format($order->total * 1.9558, 2) }} BGN</td></tr>
+            <tr><td class="dark-label">Основание</td><td>Поръчка #{{ $order->id }}</td></tr>
+            <tr><td colspan="2" class="dark-note">След като потвърдим получаването на плащането, ще подготвим и изпратим пратката ви.</td></tr>
+        </table>
+    @endif
 
-<p><strong>Доставка:</strong> {{ number_format($order->shipping_price, 2) }} € / {{ number_format($order->shipping_price*1.9558, 2) }} лв.</p>
-<p><strong>Общо:</strong> {{ number_format($order->total, 2) }} € / {{ number_format($order->total*1.9558, 2) }} лв.</p>
+    <div class="section-title">Адрес за доставка</div>
+    <div class="info-box">
+        <strong>{{ $order->customer_name }}</strong><br>
+        {{ $order->shipping_address }}<br>
+        {{ $order->shipping_city }}
+    </div>
 
-<hr>
-
-@if ($order->payment_method === 'bank_transfer')
-    <h3>🏦 Плащане по банков превод</h3>
-    <p><strong>Получател:</strong> {{ config('services.bank_transfer.company_name') }}</p>
-    <p><strong>IBAN:</strong> {{ config('services.bank_transfer.iban') }}</p>
-    <p><strong>Банка:</strong> {{ config('services.bank_transfer.bank_name') }}</p>
-    <p><strong>BIC:</strong> {{ config('services.bank_transfer.bic') }}</p>
-    <p><strong>Сума:</strong>  {{ number_format($order->total, 2) }} {{ config('services.bank_transfer.currency') }} / {{ number_format($order->total*1.9558, 2) }} BGN</p>
-    <p><strong>Основание:</strong> Поръчка #{{ $order->id }}</p>
-    <p>След потвърждаване на плащането ще подготвим и изпратим пратката.</p>
-    <hr>
-@endif
-
-<h3>🚚 Адрес за доставка</h3>
-<p>{{ $order->shipping_address }}</p>
-<p>{{ $order->shipping_city }}</p>
-
-<p>Ще се свържем с теб при нужда.</p>
-
-<p>
-    Поздрави,<br>
-    <strong>Freshwater.bg</strong>
-</p>
+    <p style="margin: 0; color: #555555; font-size: 14px; line-height: 1.7;">
+        При въпроси или нужда от съдействие, не се колебайте да се свържете с нас.<br>
+        Ще се радваме да помогнем.
+    </p>
+@endsection

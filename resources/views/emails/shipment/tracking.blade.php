@@ -1,24 +1,36 @@
-<x-mail::message>
-# Пратката е изпратена
+@extends('emails.layout')
 
-Пратката ви е създадена в Еконт.
+@section('title', 'Пратката е изпратена')
 
-Номер на пратка: **{{ $trackingNumber ?? 'N/A' }}**
+@section('hero')
+    <strong>Пратката ви е създадена в Еконт.</strong><br>
+    Номер на пратка: <strong>{{ $trackingNumber ?? 'N/A' }}</strong>
+@endsection
 
-@php
-    $trackingUrl = null;
-    if (!empty(config('services.econt.track_url')) && !empty($trackingNumber)) {
-        $trackingUrl = rtrim(config('services.econt.track_url'), '/');
-    }
-@endphp
+@section('content')
+    @php
+        $trackingUrl = null;
+        if (! empty(config('services.econt.track_url')) && ! empty($trackingNumber)) {
+            $trackingUrl = rtrim(config('services.econt.track_url'), '/');
+        }
+    @endphp
 
-@if (!empty($trackingUrl))
-<x-mail::button :url="$trackingUrl">
-Проследи пратката
-</x-mail::button>
-@endif
+    <div class="section-title">Проследяване</div>
 
+    <div class="info-box">
+        <strong>Номер на пратка:</strong> {{ $trackingNumber ?? 'N/A' }}<br>
+        @if ($shipment?->order)
+            <strong>Поръчка:</strong> #{{ $shipment->order->id }}
+        @endif
+    </div>
 
-Благодарим,<br>
-{{ config('app.name') }}
-</x-mail::message>
+    @if (! empty($trackingUrl))
+        <p style="margin: 0 0 28px;">
+            <a href="{{ $trackingUrl }}" class="button">Проследи пратката</a>
+        </p>
+    @endif
+
+    <p style="margin: 0; color: #555555; font-size: 14px; line-height: 1.7;">
+        Благодарим, че избрахте Excite Company.
+    </p>
+@endsection

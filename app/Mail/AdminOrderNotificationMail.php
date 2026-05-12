@@ -4,10 +4,7 @@ namespace App\Mail;
 
 use App\Models\Order;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class AdminOrderNotificationMail extends Mailable
@@ -16,7 +13,7 @@ class AdminOrderNotificationMail extends Mailable
 
     public Order $order;
 
-    public function __construct(public int $orderId) 
+    public function __construct(public int $orderId)
     {
         $this->order = Order::with('items')->findOrFail($orderId);
     }
@@ -24,7 +21,7 @@ class AdminOrderNotificationMail extends Mailable
     public function build()
     {
         return $this
-            ->subject('🛒 Нова поръчка #' . $this->orderId)
+            ->subject('Нова поръчка #' . $this->orderId)
             ->view('emails.admin-order-notification')
             ->with([
                 'order' => $this->order,
