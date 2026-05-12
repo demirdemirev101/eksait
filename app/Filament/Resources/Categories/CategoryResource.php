@@ -16,6 +16,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 class CategoryResource extends Resource
 {
@@ -23,8 +24,9 @@ class CategoryResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
 
+    protected static string|UnitEnum|null $navigationGroup = 'Съдържание';
     protected static ?string $navigationLabel = 'Категории';
-     protected static ?string $modelLabel = 'категория';
+    protected static ?string $modelLabel = 'категория';
     protected static ?string $pluralModelLabel = 'Категории';
 
 

@@ -14,6 +14,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 class SettingResource extends Resource
 {
@@ -21,8 +22,9 @@ class SettingResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'uni-setting-o';
 
-    protected static ?string $navigationLabel = 'Настройки';
-     protected static ?string $modelLabel = 'настройки';
+    protected static string|UnitEnum|null $navigationGroup = 'Администрация';
+    protected static ?string $navigationLabel = 'Настройки на магазина';
+    protected static ?string $modelLabel = 'настройки';
     protected static ?string $pluralModelLabel = 'Настройки';
 
     public static function canAccess(): bool

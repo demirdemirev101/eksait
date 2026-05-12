@@ -150,10 +150,6 @@ class DatabaseSeeder extends Seeder
         | Other seeders
         |--------------------------------------------------------------------------
         */
-        $this->call([
-            CategorySeeder::class,
-        ]);
-
         Product::create([
             'name' => 'Система за обратна осмоза INFINITY',
             'price' => 13.59,

@@ -16,7 +16,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 class OrderResource extends Resource
 {
@@ -24,7 +26,8 @@ class OrderResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::ShoppingCart;
 
-    protected static ?string $navigationLabel = 'Поръчки';
+    protected static string|UnitEnum|null $navigationGroup = 'Продажби';
+    protected static ?string $navigationLabel = 'Поръчки през сайта';
     protected static ?string $pluralModelLabel = 'Поръчки';
     protected static ?string $modelLabel = 'Поръчка';
 
@@ -62,6 +65,14 @@ class OrderResource extends Resource
     public static function canDeleteAny(): bool
     {
         return false;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where(fn (Builder $query) => $query
+                ->where('source', '!=', 'panel')
+                ->orWhereNull('source'));
     }
 
     public static function form(Schema $schema): Schema

@@ -17,6 +17,7 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Auth;
 use \Illuminate\Database\Eloquent\Model;
+use UnitEnum;
 
 class UserResource extends Resource
 {
@@ -24,6 +25,7 @@ class UserResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-users';
 
+    protected static string|UnitEnum|null $navigationGroup = 'Администрация';
     protected static ?string $navigationLabel = 'Потребители';
 
     /* ===============================
