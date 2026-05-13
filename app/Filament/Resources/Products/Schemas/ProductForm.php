@@ -30,9 +30,6 @@ class ProductForm
                     ->disabled()
                     ->dehydrated()
                     ->required(),
-                RichEditor::make('short_description')
-                    ->label('Кратко описание')
-                    ->columnSpanFull(),
                 RichEditor::make('description')
                     ->label('Описание')
                     ->columnSpanFull(),
@@ -52,7 +49,6 @@ class ProductForm
                                 ->numeric()
                                 ->suffix('кг'),
                         ]),
-
                         Toggle::make('stock')
                             ->label('Следи наличност')
                             ->reactive()

@@ -25,7 +25,6 @@ return new class extends Migration
             $table->decimal('sale_price', 10, 2)->nullable();
             $table->boolean('stock')->nullable();
 
-            $table->longText('short_description')->nullable();
             $table->longText('description')->nullable();
             
             $table->longText('extra_information')->nullable();

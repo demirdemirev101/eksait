@@ -23,7 +23,6 @@ class ProductAPIResource extends JsonResource
             'sale_price' => $this->sale_price ? number_format((float) $this->sale_price, 2, '.', '') : null,
             'stock' => $this->stock,
             'quantity' => $this->quantity ? $this->quantity : null,
-            'short_description' => $this->short_description,
             'description' => $this->description,
             'extra_information' => $this->extra_information,
             'categories' => $this->categories,

@@ -19,7 +19,6 @@ class Product extends Model
         'sale_price',
         'stock',
         'slug',
-        'short_description',
         'description',
         'extra_information',
         'quantity',
