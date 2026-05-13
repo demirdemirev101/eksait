@@ -94,7 +94,9 @@ class OrderService
             $this->paymentService->handle($order);
 
             // ✅ ЕДИН event, ясно и чисто
-            OrderPlaced::dispatch($order->id, $data['session_id'] ?? $data['sessionId'] ?? null);
+            if ($order->payment_method !== 'stripe') {
+                OrderPlaced::dispatch($order->id, $data['session_id'] ?? $data['sessionId'] ?? null);
+            }
 
             if (in_array($order->payment_method, ['bank_transfer', 'cod'], true)) {
                 dispatch(new CalculateBankTransferShippingJob($order->id));

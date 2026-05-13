@@ -6,8 +6,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProductApiController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\StripeController;
 
 Route::get('/products', [ProductApiController::class, 'index']);
+Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
 
 Route::middleware('optional.sanctum')->group(function () {
     // Cart routes

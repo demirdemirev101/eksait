@@ -19,6 +19,7 @@ class PaymentService
         match ($order->payment_method) {
             'cod' => $this->handleCashOnDelivery($order),
             'bank_transfer' => $this->handleBankTransfer($order),
+            'stripe' => $this->handleStripePayment($order),
             default => throw new Exception('Неразпознат метод на плащане.'),
         };
     }
@@ -46,6 +47,22 @@ class PaymentService
      * preventing any inconsistent state in the database.
      */
     private function handleBankTransfer(Order $order): void
+    {
+        DB::transaction(function () use ($order) {
+            $order->updateQuietly([
+                'payment_status' => 'pending',
+                'status'         => 'pending',
+            ]);
+        });
+    }
+    /**
+     * Handle the Stripe payment method for an order.
+     *  This method updates the order's payment status to 'pending' and its status to 'pending' within a database transaction.
+     *  This indicates that the order is awaiting payment confirmation before it can be processed for shipment.
+     * The use of a transaction ensures that the changes to the order are atomic, meaning that they will either all succeed or all fail together,
+     * preventing any inconsistent state in the database.
+     */
+    private function handleStripePayment(Order $order): void
     {
         DB::transaction(function () use ($order) {
             $order->updateQuietly([

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\CheckoutException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CalculateShippingRequest;
+use App\Http\Requests\CheckoutRequest;
+use App\Http\Requests\EcontOfficesRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -11,6 +14,7 @@ use App\Services\CartService;
 use App\Services\Econt\EcontCityResolverService;
 use App\Services\OrderService;
 use App\Services\SettingsService;
+use App\Services\StripeCheckoutService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -134,11 +138,9 @@ class CheckoutController extends Controller
     /**
      * Return Econt offices for a city in a stable JSON shape used by the React checkout.
      */
-    public function econtOffices(Request $request, EcontCityResolverService $econtCityResolverService)
+    public function econtOffices(EcontOfficesRequest $request, EcontCityResolverService $econtCityResolverService)
     {
-        $validated = $request->validate([
-            'city' => 'required|string',
-        ]);
+        $validated = $request->validated();
 
         $city = trim($validated['city']);
         try {
@@ -170,23 +172,9 @@ class CheckoutController extends Controller
      * Calculate shipping cost for the current cart based on shipping address.
      * This is used by frontend to show shipping cost before checkout.
      */
-    public function calculateShipping(Request $request, SettingsService $settingsService)
+    public function calculateShipping(CalculateShippingRequest $request, SettingsService $settingsService)
     {
-        $validated = $request->validate([
-            'customer_name' => 'nullable|string',
-            'customer_email' => 'nullable|email',
-            'customer_phone' => 'nullable|string',
-            'shipping_method' => 'required|in:address,office,apm',
-            'shipping_address' => 'required_if:shipping_method,address|string',
-            'shipping_city' => 'required|string',
-            'shipping_postcode' => 'nullable|string',
-            'econt_office_code' => 'required_if:shipping_method,office,apm|string|nullable',
-            'payment_method' => 'nullable|string',
-            'session_id' => 'sometimes|string',
-            'items' => 'sometimes|array|min:1',
-            'items.*.product_id' => 'required_with:items|integer|exists:products,id',
-            'items.*.quantity' => 'required_with:items|integer|min:1',
-        ]);
+        $validated = $request->validated();
 
         $cartService = $this->getCartService($request);
         $requestedSessionId = $this->frontendCartSessionId($request);
@@ -259,28 +247,23 @@ class CheckoutController extends Controller
       * @return \Illuminate\Http\JsonResponse
       * @throws \App\Exceptions\CheckoutException
      */
-    public function store(Request $request, OrderService $orderService) 
+    public function store(CheckoutRequest $request, OrderService $orderService, StripeCheckoutService $stripeCheckoutService) 
     {
-        $validated = $request->validate([
-            'customer_name'     => 'required|string',
-            'customer_email'    => 'required|email',
-            'customer_phone'    => 'nullable|string',
-            'shipping_method'   => 'required|in:address,office,apm',
-            'shipping_address'  => 'required_if:shipping_method,address|string',
-            'shipping_city'     => 'required|string',
-            'shipping_postcode' => 'nullable|string',
-            'econt_office_code' => 'required_if:shipping_method,office,apm|string',
-            'payment_method'    => 'required|in:bank_transfer,cod',
-            'session_id'       => 'sometimes|string',
-            'notes'             => 'nullable|string',
-            'items'             => 'required|array|min:1',
-            'items.*.product_id' => 'required|integer|exists:products,id',
-            'items.*.quantity'   => 'required|integer|min:1',
-        ]);
+        $validated = $request->validated();
         $validated['session_id'] = $this->frontendCartSessionId($request);
 
         try {
             $order = $orderService->createFromItems($validated);
+
+            if ($order->payment_method === 'stripe') {
+                $session = $stripeCheckoutService->createSession($order, $validated['session_id'] ?? null);
+
+                return response()->json([
+                    'success' => true,
+                    'order_id' => $order->id,
+                    'checkout_url' => $session->url,
+                ]);
+            }
 
             return response()->json([
                 'success'  => true,
