@@ -2,6 +2,7 @@
 
 namespace App\Listeners;
 
+use App\Events\ShipmentCreated;
 use App\Jobs\NotifyAdminShipmentFailedJob;
 use App\Jobs\SendTrackingEmailJob;
 use App\Models\Order;
@@ -27,15 +28,16 @@ class SendShipmentToEcont implements ShouldQueue
     // For example, if Econt API is down, we might want to wait a bit before retrying to avoid hitting it too frequently
     public $backoff = [30, 60, 120];
 
-    public function handle($event): void
+    public function handle(ShipmentCreated $event): void
     {
-        $order = Order::with('shipment')->findOrFail($event->orderId);
-        $shipment = $order->shipment;
+        $shipment = Shipment::with('order')->findOrFail($event->shipmentId);
+        $order = $shipment->order;
 
-        if (!$shipment || $shipment->status !== 'created') {
+        if (!$order || $shipment->status !== 'created') {
             Log::warning('Shipment not ready for Econt', [
-                'order_id' => $order->id,
-                'status' => $shipment?->status,
+                'order_id' => $event->orderId,
+                'shipment_id' => $shipment->id,
+                'status' => $shipment->status,
             ]);
             return;
         }

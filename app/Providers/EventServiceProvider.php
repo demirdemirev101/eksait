@@ -4,9 +4,9 @@ namespace App\Providers;
 
 use App\Events\OrderPlaced;
 use App\Events\OrderReadyForShipment;
+use App\Events\ShipmentCreated;
 use App\Listeners\ClearCartAfterOrder;
 use App\Listeners\CreateEcontShipment;
-use App\Listeners\CreateShipment;
 use App\Listeners\MergeGuestCart;
 use App\Listeners\SendAdminOrderNotification;
 use App\Listeners\SendOrderConfirmationEmail;
@@ -39,6 +39,9 @@ class EventServiceProvider extends ServiceProvider
      */
         OrderReadyForShipment::class => [
             CreateEcontShipment::class,
+        ],
+
+        ShipmentCreated::class => [
             SendShipmentToEcont::class,
         ],
     ];

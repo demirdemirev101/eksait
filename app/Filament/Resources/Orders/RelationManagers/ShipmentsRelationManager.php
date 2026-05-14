@@ -14,7 +14,7 @@ use Livewire\Attributes\On;
 
 class ShipmentsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'shipment';
+    protected static string $relationship = 'shipments';
     protected static ?string $title = 'Доставка';
     protected static ?string $recordTitleAttribute = 'tracking_number';
 

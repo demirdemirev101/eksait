@@ -88,9 +88,7 @@ class OrdersTable
                 //
             ])
             ->recordActions([
-                EditAction::make()
-                    ->authorize(fn ($record) => $record->status === 'pending_review'
-                            || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid')),
+                EditAction::make(),
                 DeleteAction::make()
                     ->authorize(fn ($record) =>($record->status === 'pending_review'
                             || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid'))),

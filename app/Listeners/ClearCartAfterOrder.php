@@ -3,19 +3,32 @@
 namespace App\Listeners;
 
 use App\Events\OrderPlaced;
-use App\Services\CartService;
+use App\Models\Cart;
+use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 
 class ClearCartAfterOrder
 {
-    /**
-     * Clearing the cart after an order is placed to ensure that the user's cart is empty and ready for new items after they have completed a purchase.
-     *  This listener listens for the OrderPlaced event and then calls the clear method on the CartService to empty the cart.
-     * @param OrderPlaced $event The event instance containing information about the placed order,
-     *  which can be used if needed to perform additional actions related to clearing the cart.
-     * @return void
-     */
     public function handle(OrderPlaced $event): void
     {
-        (new CartService($event->sessionId))->clear();
+        $order = Order::query()->find($event->orderId);
+
+        if (! $order) {
+            return;
+        }
+
+        DB::transaction(function () use ($order, $event) {
+            if ($order->user_id) {
+                Cart::query()
+                    ->where('user_id', $order->user_id)
+                    ->each(fn (Cart $cart) => $cart->items()->delete());
+            }
+
+            if ($event->sessionId) {
+                Cart::query()
+                    ->where('session_id', $event->sessionId)
+                    ->each(fn (Cart $cart) => $cart->items()->delete());
+            }
+        });
     }
 }

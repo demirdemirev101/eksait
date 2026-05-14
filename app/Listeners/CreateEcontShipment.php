@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\OrderReadyForShipment;
+use App\Events\ShipmentCreated;
 use App\Models\Order;
 use App\Services\WeightCalculatorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -61,6 +62,8 @@ class CreateEcontShipment implements ShouldQueue
             'weight' => $weight,
             'delivery_type' => $deliveryType,
         ]);
+
+        event(new ShipmentCreated($shipment->id, $order->id));
     }
 
     /**

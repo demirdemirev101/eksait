@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Events\OrderReadyForShipment;
 use Exception;
 use Illuminate\Support\Facades\DB;
 

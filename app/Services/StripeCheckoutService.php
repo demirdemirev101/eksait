@@ -43,10 +43,12 @@ class StripeCheckoutService
             ];
         }
 
-        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+        $frontendUrl = $this->frontendUrl();
 
         return $this->stripe->checkout->sessions->create([
             'mode' => 'payment',
+            'locale' => 'bg',
+            'payment_method_types' => ['card'],
             'customer_email' => $order->customer_email,
             'line_items' => $lineItems,
 
@@ -70,5 +72,30 @@ class StripeCheckoutService
     private function toMinorUnit(float $amount): int
     {
         return (int) round($amount * 100);
+    }
+
+    private function frontendUrl(): string
+    {
+        $urls = array_filter(array_map(
+            'trim',
+            explode(',', (string) env('FRONTEND_URLS', ''))
+        ));
+
+        foreach ($urls as $url) {
+            $host = parse_url($url, PHP_URL_HOST);
+
+            if ($host && ! in_array($host, ['localhost', '127.0.0.1'], true)) {
+                return rtrim($url, '/');
+            }
+        }
+
+        $configuredUrl = (string) config('app.frontend_url', '');
+        $configuredHost = parse_url($configuredUrl, PHP_URL_HOST);
+
+        if ($configuredHost && ! in_array($configuredHost, ['localhost', '127.0.0.1'], true)) {
+            return rtrim($configuredUrl, '/');
+        }
+
+        return 'http://192.168.1.102:5173';
     }
 }

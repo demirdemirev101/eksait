@@ -85,4 +85,12 @@ class Order extends Model
     {
         return $this->hasOne(Shipment::class);
     }
+
+    /**
+     * Define a has-many relationship to shipments for Filament relation tables.
+     */
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class);
+    }
 }

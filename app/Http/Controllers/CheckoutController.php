@@ -277,8 +277,8 @@ class CheckoutController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => 'An unexpected error occurred during checkout. Please try again later.',
-            ], $e->getCode() ?: 422);
+                'message' => $e->getMessage(),
+            ], $e->status());
 
         } catch (\Exception $e) {
             Log::error('Checkout failed', [
