@@ -23,7 +23,7 @@ class EnsureUserCanAccessAdmin
         }
 
         // the user is logged in but does not have the required role, abort with 403
-        if (! $user->hasAnyRole(['admin', 'superadmin'])) {
+        if (! $user->hasRole('admin')) {
             abort(403);
         }
 

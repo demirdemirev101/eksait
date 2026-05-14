@@ -129,7 +129,7 @@ class ShipmentsRelationManager extends RelationManager
                     ->url(fn ($record) => $record->label_url)
                     ->openUrlInNewTab()
                     ->authorize(fn ($record) => !empty($record->label_url) 
-                    && $record->status !== 'cancelled' && Auth::user()->can('view shipments')),
+                    && $record->status !== 'cancelled'),
             ])
             ->emptyStateHeading('Няма доставка')
             ->emptyStateIcon('heroicon-o-truck');

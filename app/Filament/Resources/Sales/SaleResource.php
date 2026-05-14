@@ -36,31 +36,6 @@ class SaleResource extends Resource
     protected static ?string $modelLabel = 'продажба';
     protected static ?string $pluralModelLabel = 'Продажби';
 
-    public static function canAccess(): bool
-    {
-        return Auth::user()?->can('view orders') ?? false;
-    }
-
-    public static function canCreate(): bool
-    {
-        return Auth::user()?->can('view orders') ?? false;
-    }
-
-    public static function canEdit($record): bool
-    {
-        return false;
-    }
-
-    public static function canDelete($record): bool
-    {
-        return false;
-    }
-
-    public static function canDeleteAny(): bool
-    {
-        return false;
-    }
-
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

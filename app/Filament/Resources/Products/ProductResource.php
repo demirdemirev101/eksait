@@ -29,39 +29,6 @@ class ProductResource extends Resource
     protected static ?string $modelLabel = 'продукт';
     protected static ?string $pluralModelLabel = 'Продукти';
 
-    /* ===============================
-     | Resource visibility (sidebar)
-     =============================== */
-    public static function canAccess(): bool
-    {
-        return Auth::user()->can('view products');
-    }
-
-    /* ===============================
-     | CRUD permissions
-     =============================== */
-    public static function canCreate(): bool
-    {
-        return Auth::user()->can('create products');
-    }
-
-    public static function canEdit($record): bool
-    {
-        return Auth::user()->can('edit products');
-    }
-    public static function canDelete($record): bool
-    {
-        return Auth::user()->can('delete products');
-    }
-    public static function canView($record): bool
-    {
-        return Auth::user()->can('view products');
-    }
-    public static function canViewAny(): bool
-    {
-        return Auth::user()->can('view products');
-    }
-    //=============================
     public static function form(Schema $schema): Schema
     {
         return ProductForm::configure($schema);

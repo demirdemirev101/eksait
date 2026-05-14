@@ -89,22 +89,19 @@ class OrdersTable
             ])
             ->recordActions([
                 EditAction::make()
-                    ->authorize(fn ($record) => Auth::user()->can('edit orders')
-                        && ($record->status === 'pending_review'
-                            || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid'))),
+                    ->authorize(fn ($record) => $record->status === 'pending_review'
+                            || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid')),
                 DeleteAction::make()
-                    ->authorize(fn ($record) => Auth::user()->can('delete orders')
-                        && ($record->status === 'pending_review'
+                    ->authorize(fn ($record) =>($record->status === 'pending_review'
                             || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid'))),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->authorize(fn (? \Illuminate\Database\Eloquent\Model $record) => $record
-                            ? (Auth::user()->can('delete orders')
-                                && ($record->status === 'pending_review'
+                            ? ( ($record->status === 'pending_review'
                                     || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid')))
-                            : Auth::user()->can('delete orders')),
+                            : true),
                 ]),
             ]);
     }

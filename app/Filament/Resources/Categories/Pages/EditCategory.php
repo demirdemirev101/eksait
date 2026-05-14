@@ -14,8 +14,7 @@ class EditCategory extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->label('Изтрий категория')
-                ->authorize(fn ($record) => CategoryResource::canDelete($record)),
+                ->label('Изтрий категория'),
         ];
     }
 }

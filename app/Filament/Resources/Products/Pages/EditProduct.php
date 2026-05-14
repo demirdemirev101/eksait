@@ -16,8 +16,7 @@ class EditProduct extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->label('Изтрий продукт')
-                ->authorize(fn () => ProductResource::canDelete($this->record)),
+                ->label('Изтрий продукт'),
         ];
     }
 }

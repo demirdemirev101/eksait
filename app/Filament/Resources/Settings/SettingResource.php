@@ -27,37 +27,6 @@ class SettingResource extends Resource
     protected static ?string $modelLabel = 'настройки';
     protected static ?string $pluralModelLabel = 'Настройки';
 
-    public static function canAccess(): bool
-    {
-        return Auth::user()->can('manage settings');
-    }
-
-    public static function canViewAny(): bool
-    {
-        return Auth::user()->can('manage settings');
-    }
-
-    public static function canCreate(): bool
-    {
-        return Auth::user()->can('manage settings') && Setting::count() === 0;
-    }
-
-    public static function canEdit($record): bool
-    {
-        return Auth::user()->can('manage settings');
-    }
-
-    public static function canDelete($record): bool
-    {
-        return Auth::user()->can('manage settings');
-    }
-
-    public static function canDeleteAny(): bool
-    {
-        return Auth::user()->can('manage settings');
-    }
-
-
     public static function form(Schema $schema): Schema
     {
         return SettingForm::configure($schema);

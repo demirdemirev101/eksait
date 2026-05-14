@@ -16,8 +16,7 @@ class ListSettings extends ListRecords
     {
         return [
              CreateAction::make()
-            ->label('Създай настройки')
-            ->authorize(fn ($record) => SettingResource::canCreate($record)),
+            ->label('Създай настройки'),
         ];
     }
 }

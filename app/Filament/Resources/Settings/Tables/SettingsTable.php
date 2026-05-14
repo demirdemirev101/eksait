@@ -35,9 +35,9 @@ class SettingsTable
             ])
             ->recordActions([
                 EditAction::make()
-                    ->authorize(fn ($record) => SettingResource::canEdit($record)),
+                    ->label('Редактирай'),
                 DeleteAction::make()
-                    ->authorize(fn ($record) => SettingResource::canDelete($record)),
+                    ->label('Изтрий'),
             ])
             ->toolbarActions([
                 //

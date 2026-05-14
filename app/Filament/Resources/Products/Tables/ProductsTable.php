@@ -54,17 +54,13 @@ class ProductsTable
                 //
             ])
             ->recordActions([
-                ViewAction::make()
-                    ->visible(fn () => Auth::user()->can('view products')),
-                EditAction::make()
-                    ->visible(fn () => Auth::user()->can('edit products')),
-                DeleteAction::make()
-                    ->visible(fn () => Auth::user()->can('delete products')),
+                ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make()
-                        ->authorize(fn () => Auth::user()->can('delete products')),
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

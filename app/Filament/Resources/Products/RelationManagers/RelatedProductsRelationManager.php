@@ -61,14 +61,12 @@ class RelatedProductsRelationManager extends RelationManager
             ])
             ->recordActions([
                 DetachAction::make()
-                    ->label('Премахни')
-                    ->authorize(fn () => Auth::user()->can('detach related products')),
+                    ->label('Премахни'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DetachBulkAction::make()
-                        ->label('Премахни избраните')
-                        ->authorize(fn () => Auth::user()->can('detach related products')),
+                        ->label('Премахни избраните'),
                 ]),
             ]);
     }

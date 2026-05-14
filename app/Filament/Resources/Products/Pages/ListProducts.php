@@ -13,8 +13,7 @@ class ListProducts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->authorize(fn () => ProductResource::canCreate()),
+            CreateAction::make(),
         ];
     }
 }

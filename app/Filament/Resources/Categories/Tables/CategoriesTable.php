@@ -34,15 +34,12 @@ class CategoriesTable
             ])
             ->recordActions([
                 EditAction::make()
-                    ->label('Редактирай')
-                    ->authorize(fn ($record) => CategoryResource::canEdit($record)),
-                DeleteAction::make()
-                    ->authorize(fn ($record) => CategoryResource::canDelete($record)),
+                    ->label('Редактирай'),
+                DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make()
-                        ->authorize(fn ($record) => CategoryResource::canDelete($record)),
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

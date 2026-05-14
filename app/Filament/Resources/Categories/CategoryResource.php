@@ -29,39 +29,6 @@ class CategoryResource extends Resource
     protected static ?string $modelLabel = 'категория';
     protected static ?string $pluralModelLabel = 'Категории';
 
-
-    /* ===============================
-     | Access
-     =============================== */
-    public static function canAccess(): bool
-    {
-        return Auth::check() && Auth::user()->can('view categories');
-    }
-
-    public static function canViewAny(): bool
-    {
-        return Auth::check() && Auth::user()->can('view categories');
-    }
-
-    /* ===============================
-     | CRUD
-     =============================== */
-    public static function canCreate(): bool
-    {
-        return Auth::user()->can('create categories');
-    }
-
-    public static function canEdit($record): bool
-    {
-        return Auth::user()->can('edit categories');
-    }
-
-    public static function canDelete($record): bool
-    {
-        return Auth::user()->can('delete categories');
-    }
-    //==============================
-
     public static function form(Schema $schema): Schema
     {
         return CategoryForm::configure($schema);

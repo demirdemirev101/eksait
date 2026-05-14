@@ -51,12 +51,12 @@ class User extends Authenticatable
 
     /**
     * Check if the user has access to the admin panel based on their roles.
-    * Users with 'admin' or 'superadmin' roles are granted access.
+    * Users with the 'admin' role are granted access.
     *
     * @return bool
     */
     public function canAccessAdmin(): bool
     {
-        return $this->hasAnyRole(['admin', 'superadmin']);
+        return $this->hasRole('admin');
     }
 }

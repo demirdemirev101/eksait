@@ -28,47 +28,6 @@ class UserResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Администрация';
     protected static ?string $navigationLabel = 'Потребители';
 
-    /* ===============================
-     | Access
-     =============================== */
-    public static function canAccess(): bool
-    {
-        return Auth::user()->can('view users');
-    }
-
-    public static function canViewAny(): bool
-    {
-        return Auth::user()->can('view users');
-    }
-
-    /* ===============================
-     | CRUD
-     =============================== */
-    public static function canCreate(): bool
-    {
-        return Auth::user()->can('create users');
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        // ❌ admin не може да редактира superadmin
-        if ($record->hasRole('superadmin')) {
-            return false;
-        }
-
-        return Auth::user()->can('edit users');
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        // ❌ никой не трие superadmin
-        if ($record->hasRole('superadmin')) {
-            return false;
-        }
-
-        return Auth::user()->can('delete users');
-    }
-
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -107,7 +66,6 @@ class UserResource extends Resource
                     ->color(fn ($state) => match ($state) {
                         'customer' => 'info',
                         'admin' => 'primary',
-                        'superadmin' => 'success',
                         default => 'gray',
                     }),
 
@@ -117,14 +75,14 @@ class UserResource extends Resource
             ])
             ->recordActions([
                 EditAction::make()
-                    ->authorize(fn (Model $record) => UserResource::canEdit($record)),
+                    ->authorize(fn (Model $record) => $record->id !== Auth::id()),
                 DeleteAction::make()
-                    ->authorize(fn (Model $record) => UserResource::canDelete($record)),
+                    ->authorize(fn (Model $record) => $record->id !== Auth::id()),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->authorize(fn () => UserResource::canDeleteAny()),
+                        ->authorize(fn ($records) => $records->contains(fn ($record) => $record->id !== Auth::id())),
                 ]),
             ]);
     }
