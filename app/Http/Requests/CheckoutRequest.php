@@ -16,10 +16,22 @@ class CheckoutRequest extends FormRequest
 
     public function rules(): array
     {
+
+        $customerRules = $this->user()
+            ? [
+                'customer_name' => 'nullable|string',
+                'customer_email' => 'nullable|email',
+                'customer_phone' => 'nullable|string',
+            ]
+            : [
+                'customer_name' => 'required|string',
+                'customer_email' => 'required|email',
+                'customer_phone' => 'nullable|string',
+            ];
+
         return [
             ...$this->checkoutShippingRules(),
-            'customer_name' => 'required|string',
-            'customer_email' => 'required|email',
+            ...$customerRules,
             'payment_method' => 'required|in:bank_transfer,cod,stripe',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',

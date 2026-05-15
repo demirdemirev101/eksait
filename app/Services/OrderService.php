@@ -39,12 +39,14 @@ class OrderService
         return DB::transaction(function () use ($data) {
             $shippingMethod = $data['shipping_method'] ?? 'address';
 
+            $user = Auth::user();
+
             $order = Order::create([
                 // If the user is authenticated, associate the order with the user's ID. Otherwise, the order will be created without a user association.
-                'user_id'           => Auth::id(),
-                'customer_name'     => $data['customer_name'],
-                'customer_email'    => $data['customer_email'],
-                'customer_phone'    => $data['customer_phone'] ?? null,
+                'user_id'           => $user?->id,
+                'customer_name'     => $user?->name ?? $data['customer_name'],
+                'customer_email'    => $user?->email ?? $data['customer_email'],
+                'customer_phone'    => $user?->phone ?? ($data['customer_phone'] ?? null),
 
                 'shipping_address'  => $data['shipping_address'] ?? '',
                 'shipping_city'     => $data['shipping_city'],

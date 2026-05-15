@@ -44,6 +44,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            'remember' => ['sometimes', 'boolean'],
         ]);
 
         $user = null;
@@ -73,8 +74,14 @@ class AuthController extends Controller
             ]);
         }
 
+        $expiresAt = $request->boolean('remember')
+            ? now()->addDays(30)
+            : now()->addHours(8);
+
+        $token = $user->createToken('api-token', ['*'], $expiresAt)->plainTextToken;
+        
         return response()->json([
-            'token' => $user->createToken('api-token')->plainTextToken,
+            'token' => $token,
             'user' => $this->transformUser($user),
             'cart' => Auth::check() ? $this->cartPayload(new CartService(null)) : null,
         ]);

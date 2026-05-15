@@ -187,10 +187,12 @@ class CheckoutController extends Controller
             ? $cartService->subtotal()
             : (float) $requestItems->sum('total');
 
+        $user = Auth::user();
+
         $tempOrder = new Order([
-            'customer_name' => $validated['customer_name'] ?? 'Shipping Estimate',
-            'customer_email' => $validated['customer_email'] ?? null,
-            'customer_phone' => $validated['customer_phone'] ?? (string) config('services.econt.sender.phone', '0000000000'),
+            'customer_name' => $user?->name ?? ($validated['customer_name'] ?? 'Shipping Estimate'),
+            'customer_email' => $user?->email ?? ($validated['customer_email'] ?? null),
+            'customer_phone' => $user?->phone ?? ($validated['customer_phone'] ?? (string) config('services.econt.sender.phone', '0000000000')),
             'subtotal' => $effectiveSubtotal,
             'shipping_method' => $validated['shipping_method'],
             'shipping_address' => $validated['shipping_address'] ?? '',

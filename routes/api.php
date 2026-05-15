@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ProductApiController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\StripeController;
+use App\Http\Controllers\OrdersController;
 
 Route::get('/products', [ProductApiController::class, 'index']);
 Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
@@ -34,4 +35,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::get('/orders', [OrdersController::class, 'index']);
 });
