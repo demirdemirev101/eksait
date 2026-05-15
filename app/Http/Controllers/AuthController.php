@@ -120,8 +120,10 @@ class AuthController extends Controller
             ]);
         }
         
+        $token = $user->createToken('api-token', ['*'], now()->addHours(8))->plainTextToken;
+
         return response()->json([
-            'token' => $user->createToken('api-token')->plainTextToken,
+            'token' => $token,
             'user' => $this->transformUser($user),
             'cart' => Auth::check() ? $this->cartPayload(new CartService(null)) : null,
         ], 201);
