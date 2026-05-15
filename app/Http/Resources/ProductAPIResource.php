@@ -14,6 +14,12 @@ class ProductAPIResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $variants = $this->whenLoaded('variants');
+        $hasVariants = $variants instanceof \Illuminate\Support\Collection && $variants->isNotEmpty();
+        $availableVariants = $hasVariants
+            ? $variants->filter(fn ($variant) => (bool) $variant->stock && (int) $variant->quantity > 0)
+            : collect();
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -21,11 +27,29 @@ class ProductAPIResource extends JsonResource
 
             'price' => number_format((float) $this->price, 2, '.', ''),
             'sale_price' => $this->sale_price ? number_format((float) $this->sale_price, 2, '.', '') : null,
-            'stock' => (bool) $this->stock && (int) $this->quantity > 0,
-            'quantity' => max(0, (int) $this->quantity),
+            'stock' => $hasVariants
+                ? $availableVariants->isNotEmpty()
+                : ((bool) $this->stock && (int) $this->quantity > 0),
+            'quantity' => $hasVariants
+                ? (int) $availableVariants->sum('quantity')
+                : max(0, (int) $this->quantity),
             'description' => $this->description,
             'extra_information' => $this->extra_information,
             'categories' => $this->categories,
+            'variants' => $hasVariants
+                ? $variants->map(fn ($variant) => [
+                    'id' => $variant->id,
+                    'size' => $variant->size,
+                    'price' => number_format((float) $variant->price, 2, '.', ''),
+                    'sale_price' => $variant->sale_price ? number_format((float) $variant->sale_price, 2, '.', '') : null,
+                    'stock' => (bool) $variant->stock && (int) $variant->quantity > 0,
+                    'quantity' => max(0, (int) $variant->quantity),
+                    'weight' => $variant->weight !== null ? number_format((float) $variant->weight, 2, '.', '') : null,
+                    'width' => $variant->width !== null ? number_format((float) $variant->width, 2, '.', '') : null,
+                    'height' => $variant->height !== null ? number_format((float) $variant->height, 2, '.', '') : null,
+                    'length' => $variant->length !== null ? number_format((float) $variant->length, 2, '.', '') : null,
+                ])->values()
+                : [],
             'images' => $this->images->map(function ($image) {
                 return [
                     'id' => $image->id,

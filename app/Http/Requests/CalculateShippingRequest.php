@@ -20,6 +20,8 @@ class CalculateShippingRequest extends FormRequest
             ...$this->checkoutShippingRules(),
             'items' => 'sometimes|array|min:1',
             'items.*.product_id' => 'required_with:items|integer|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|integer|exists:product_variants,id',
+            'items.*.variant_id' => 'nullable|integer|exists:product_variants,id',
             'items.*.quantity' => 'required_with:items|integer|min:1',
         ];
     }

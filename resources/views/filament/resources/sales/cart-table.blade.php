@@ -188,7 +188,7 @@
             <span></span>
         </div>
 
-        @foreach ($cart as $item)
+        @foreach ($cart as $key => $item)
             <div class="sale-cart-row">
                 <div>
                     <div class="sale-cart-product">{{ $item['name'] }}</div>
@@ -206,7 +206,7 @@
                     <div class="sale-cart-qty">
                         <button
                             type="button"
-                            wire:click="decreaseCartItem({{ $item['product_id'] }})"
+                            wire:click="decreaseCartItem('{{ $key }}')"
                             aria-label="Намали"
                         >
                             <x-heroicon-m-minus style="width: 1rem; height: 1rem;" />
@@ -214,7 +214,7 @@
                         <span>{{ $item['quantity'] }}</span>
                         <button
                             type="button"
-                            wire:click="increaseCartItem({{ $item['product_id'] }})"
+                            wire:click="increaseCartItem('{{ $key }}')"
                             aria-label="Увеличи"
                         >
                             <x-heroicon-m-plus style="width: 1rem; height: 1rem;" />
@@ -230,7 +230,7 @@
                 <div class="sale-cart-right">
                     <button
                         type="button"
-                        wire:click="removeCartItem({{ $item['product_id'] }})"
+                        wire:click="removeCartItem('{{ $key }}')"
                         class="sale-cart-remove"
                         aria-label="Премахни"
                     >

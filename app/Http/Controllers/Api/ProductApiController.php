@@ -19,8 +19,9 @@ class ProductApiController extends Controller
     public function index()
     {
         $products = Product::with([
-           'categories:id,name,slug',
+            'categories:id,name,slug',
             'images:id,product_id,image_path,is_primary,sort_order',
+            'variants:id,product_id,size,price,sale_price,stock,quantity,weight,width,height,length',
         ])->get();
 
         return ProductAPIResource::collection($products);
@@ -42,12 +43,16 @@ class ProductApiController extends Controller
             ->with([
                 'categories:id,name,slug',
                 'images:id,product_id,image_path,is_primary,sort_order',
+                'variants:id,product_id,size,price,sale_price,stock,quantity,weight,width,height,length',
             ])
             ->where(function ($q) use ($normalized, $slugQuery) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
                     ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"])
                     ->orWhereRaw('LOWER(description) LIKE ?', ["%{$normalized}%"])
                     ->orWhereRaw('LOWER(extra_information) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereHas('variants', function ($variantQuery) use ($normalized) {
+                        $variantQuery->whereRaw('LOWER(size) LIKE ?', ["%{$normalized}%"]);
+                    })
                     ->orWhereHas('categories', function ($categoryQuery) use ($normalized, $slugQuery) {
                         $categoryQuery
                             ->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])

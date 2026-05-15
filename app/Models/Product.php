@@ -23,6 +23,9 @@ class Product extends Model
         'extra_information',
         'quantity',
         'weight',
+        'width',
+        'height',
+        'length',
     ];
 
     /**
@@ -33,6 +36,9 @@ class Product extends Model
         'stock' => 'boolean',
         'sale_price' => 'decimal:2',
         'weight' => 'decimal:2',
+        'width' => 'decimal:2',
+        'height' => 'decimal:2',
+        'length' => 'decimal:2',
     ];
 
     /**
@@ -80,10 +86,30 @@ class Product extends Model
      */
     public static function booted()
     {
-        static::saving(function (Product $product){
-            if($product->isDirty('name')){
-                $product->slug = Str::slug($product->name);
+        static::saving(function (Product $product) {
+            if ($product->isDirty('name')) {
+                $baseSlug = Str::slug($product->name);
+                $slug = $baseSlug;
+                $count = 1;
+
+                while (
+                    static::where('slug', $slug)
+                        ->where('id', '!=', $product->id ?? 0)
+                        ->exists()
+                ) {
+                    $slug = $baseSlug . '-' . ++$count;
+                }
+
+                $product->slug = $slug;
             }
         });
+    }
+
+    /**
+     * Define a one-to-many relationship for product variants.
+     */
+    public function variants() : HasMany
+    {
+        return $this->hasMany(ProductVariant::class);
     }
 }

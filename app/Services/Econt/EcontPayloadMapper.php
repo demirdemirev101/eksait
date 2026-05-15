@@ -47,7 +47,8 @@ class EcontPayloadMapper
                 'phones' => [$phone],
             ],
 
-            'shipmentType' => 'PACK',
+            'shipmentType' => $this->resolveShipmentType($shipment),
+            'sizeUnder60cm' => $this->isSizeUnder60cm($shipment),
             'weight' => round($shipment->weight, 3),
             'packCount' => $shipment->pack_count ?? 1,
             'shipmentDescription' => 'Package',
@@ -115,6 +116,43 @@ class EcontPayloadMapper
         }
 
         return $payload;
+    }
+
+    private function resolveShipmentType(Shipment $shipment): string
+    {
+        $maxPackWeight = (float) config('services.econt.max_pack_weight_kg', 30);
+        $cargoDimensionFrom = (float) config('services.econt.cargo_dimension_from_cm', 60);
+
+        $weight = (float) ($shipment->weight ?? 0);
+        $width = (float) ($shipment->width ?? 0);
+        $height = (float) ($shipment->height ?? 0);
+        $length = (float) ($shipment->length ?? 0);
+
+        if (
+            $weight > $maxPackWeight
+            || $width >= $cargoDimensionFrom
+            || $height >= $cargoDimensionFrom
+            || $length >= $cargoDimensionFrom
+        ) {
+            return 'CARGO';
+        }
+
+        return 'PACK';
+    }
+
+    private function isSizeUnder60cm(Shipment $shipment): bool
+    {
+        $limit = (float) config('services.econt.cargo_dimension_from_cm', 60);
+
+        $width = (float) ($shipment->width ?? 0);
+        $height = (float) ($shipment->height ?? 0);
+        $length = (float) ($shipment->length ?? 0);
+
+        if ($width === 0.0 && $height === 0.0 && $length === 0.0) {
+            return true;
+        }
+
+        return $width < $limit && $height < $limit && $length < $limit;
     }
     /**
      * Formats a phone number to ensure it is in the correct format for Econt API. The method performs the following steps:

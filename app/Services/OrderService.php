@@ -6,6 +6,7 @@ use App\Events\OrderPlaced;
 use App\Jobs\CalculateBankTransferShippingJob;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -55,6 +56,12 @@ class OrderService
                 'econt_office_code' => $shippingMethod === 'address'
                     ? null
                     : ($data['econt_office_code'] ?? null),
+                'econt_office_name' => $shippingMethod === 'address'
+                    ? null
+                    : ($data['econt_office_name'] ?? null),
+                'econt_office_address' => $shippingMethod === 'address'
+                    ? null
+                    : ($data['econt_office_address'] ?? null),
                 'holiday_delivery_day' => $data['holiday_delivery_day'] ?? null,
 
                 'status'            => 'pending',
@@ -72,15 +79,40 @@ class OrderService
             $subtotal = 0;
             foreach ($data['items'] as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
-                $this->stockService->reserve($product, (int)$itemData['quantity']);
-                $productName = $product->name;
-                $price = $product->sale_price ?? $product->price;
+                $variantId = $itemData['product_variant_id'] ?? $itemData['variant_id'] ?? null;
+                $variant = null;
+
+                if ($variantId) {
+                    $variant = ProductVariant::where('product_id', $product->id)
+                        ->whereKey($variantId)
+                        ->first();
+
+                    if (! $variant) {
+                        throw new \App\Exceptions\CheckoutException("Невалиден вариант за продукт: {$product->name}", 422);
+                    }
+                } elseif ($product->variants()->exists()) {
+                    throw new \App\Exceptions\CheckoutException("Моля, изберете вариант за продукт: {$product->name}", 422);
+                }
+
+                if ($variant) {
+                    $this->stockService->reserveVariant($variant, (int) $itemData['quantity']);
+                } else {
+                    $this->stockService->reserve($product, (int) $itemData['quantity']);
+                }
+
+                $productName = $variant?->size
+                    ? "{$product->name} - {$variant->size}"
+                    : $product->name;
+                $price = $variant
+                    ? ($variant->sale_price ?? $variant->price)
+                    : ($product->sale_price ?? $product->price);
                 $total = $price * $itemData['quantity'];
                 
                 $subtotal += $total;
 
                 $order->items()->create([
                     'product_id'   => $itemData['product_id'],
+                    'product_variant_id' => $variant?->id,
                     'product_name' => $productName,
                     'price'        => $price,
                     'quantity'     => $itemData['quantity'],
@@ -97,11 +129,14 @@ class OrderService
 
             // ✅ ЕДИН event, ясно и чисто
             if ($order->payment_method !== 'stripe') {
-                OrderPlaced::dispatch($order->id, $data['session_id'] ?? $data['sessionId'] ?? null);
+                DB::afterCommit(fn () => OrderPlaced::dispatch(
+                    $order->id,
+                    $data['session_id'] ?? $data['sessionId'] ?? null
+                ));
             }
 
             if (in_array($order->payment_method, ['bank_transfer', 'cod'], true)) {
-                dispatch(new CalculateBankTransferShippingJob($order->id));
+                DB::afterCommit(fn () => dispatch(new CalculateBankTransferShippingJob($order->id)));
             }
 
             return $order;

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Cart;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,17 +35,15 @@ class CartService
         return Cart::firstOrCreate(['session_id' => $this->sessionId]);
     }
 
-    public function add(Product $product, int $quantity = 1): void
+    public function add(Product $product, int $quantity = 1, ?ProductVariant $variant = null): void
     {
-        DB::transaction(function () use ($product, $quantity) {
-            $item = $this->cart->items()
-                ->where('product_id', $product->id)
-                ->first();
+        DB::transaction(function () use ($product, $quantity, $variant) {
+            $item = $this->cartItemQuery($product, $variant)->first();
 
             $totalQuantity = $quantity + (int) ($item?->quantity ?? 0);
-            $this->ensureProductQuantityAvailable($product, $totalQuantity);
+            $this->ensureQuantityAvailable($product, $totalQuantity, $variant);
 
-            $price = $product->sale_price ?? $product->price;
+            $price = $this->priceFor($product, $variant);
 
             if ($item) {
                 $item->quantity += $quantity;
@@ -53,6 +52,7 @@ class CartService
             } else {
                 $this->cart->items()->create([
                     'product_id' => $product->id,
+                    'product_variant_id' => $variant?->id,
                     'quantity'   => $quantity,
                     'price'      => $price,
                     'total'      => $quantity * $price,
@@ -61,7 +61,7 @@ class CartService
         });
     }
 
-    public function update(Product $product, int $quantity): void
+    public function update(Product $product, int $quantity, ?ProductVariant $variant = null): void
     {
         if ($quantity < 1) {
             throw ValidationException::withMessages([
@@ -69,28 +69,25 @@ class CartService
             ]);
         }
 
-        $this->ensureProductQuantityAvailable($product, $quantity);
+        $this->ensureQuantityAvailable($product, $quantity, $variant);
 
-        $price = $product->sale_price ?? $product->price;
+        $price = $this->priceFor($product, $variant);
 
-        $this->cart->items()
-            ->where('product_id', $product->id)
+        $this->cartItemQuery($product, $variant)
             ->update([
                 'quantity' => $quantity,
                 'total'    => $quantity * $price,
             ]);
     }
 
-    public function remove(Product $product): void
+    public function remove(Product $product, ?ProductVariant $variant = null): void
     {
-        $this->cart->items()
-            ->where('product_id', $product->id)
-            ->delete();
+        $this->cartItemQuery($product, $variant)->delete();
     }
 
     public function items()
     {
-        return $this->cart->items()->with('product')->get();
+        return $this->cart->items()->with(['product', 'variant'])->get();
     }
 
     public function clear(): void
@@ -149,6 +146,11 @@ class CartService
             foreach ($guestCart->items as $guestItem) {
                 $userItem = $userCart->items()
                     ->where('product_id', $guestItem->product_id)
+                    ->when(
+                        $guestItem->product_variant_id,
+                        fn ($query) => $query->where('product_variant_id', $guestItem->product_variant_id),
+                        fn ($query) => $query->whereNull('product_variant_id')
+                    )
                     ->first();
 
                 if ($userItem) {
@@ -158,6 +160,7 @@ class CartService
                 } else {
                     $userCart->items()->create([
                         'product_id' => $guestItem->product_id,
+                        'product_variant_id' => $guestItem->product_variant_id,
                         'quantity'   => $guestItem->quantity,
                         'price'      => $guestItem->price,
                         'total'      => $guestItem->total,
@@ -177,20 +180,38 @@ class CartService
         return Cart::where('session_id', $this->sessionId)->exists();
     }
 
-    private function ensureProductQuantityAvailable(Product $product, int $quantity): void
+    private function ensureQuantityAvailable(Product $product, int $quantity, ?ProductVariant $variant = null): void
     {
-        $product->refresh();
+        $stockTarget = $variant ? $variant->refresh() : $product->refresh();
 
-        if (! $product->stock || (int) $product->quantity <= 0) {
+        if (! $stockTarget->stock || (int) $stockTarget->quantity <= 0) {
             throw ValidationException::withMessages([
                 'product' => 'Продуктът не е наличен.',
             ]);
         }
 
-        if ($quantity > (int) $product->quantity) {
+        if ($quantity > (int) $stockTarget->quantity) {
             throw ValidationException::withMessages([
-                'quantity' => "Налични са само {$product->quantity} бр.",
+                'quantity' => "Налични са само {$stockTarget->quantity} бр.",
             ]);
         }
+    }
+
+    private function cartItemQuery(Product $product, ?ProductVariant $variant)
+    {
+        return $this->cart->items()
+            ->where('product_id', $product->id)
+            ->when(
+                $variant,
+                fn ($query) => $query->where('product_variant_id', $variant->id),
+                fn ($query) => $query->whereNull('product_variant_id')
+            );
+    }
+
+    private function priceFor(Product $product, ?ProductVariant $variant = null): float
+    {
+        return (float) ($variant
+            ? ($variant->sale_price ?? $variant->price ?? 0)
+            : ($product->sale_price ?? $product->price ?? 0));
     }
 }

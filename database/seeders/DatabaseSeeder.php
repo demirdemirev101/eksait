@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductVariant;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -122,6 +123,40 @@ class DatabaseSeeder extends Seeder
                 [
                     'image_path' => $productData['image_path'],
                     'is_primary' => true,
+                ],
+            );
+        }
+
+        $variantCategory = Category::firstOrCreate(['name' => 'Test variants']);
+        $variantProduct = Product::updateOrCreate(
+            ['name' => 'Cobalt drill TITEX'],
+            [
+                'price' => null,
+                'sale_price' => null,
+                'stock' => true,
+                'quantity' => 0,
+                'description' => '<p>Variant product sample.</p>',
+                'extra_information' => '<p></p>',
+            ],
+        );
+        $variantProduct->categories()->syncWithoutDetaching([$variantCategory->id]);
+
+        foreach ([
+            ['size' => 'F0.35', 'quantity' => 20, 'price' => 3],
+            ['size' => 'F0.50', 'quantity' => 20, 'price' => 2],
+            ['size' => 'F0.60', 'quantity' => 29, 'price' => 2],
+        ] as $variantData) {
+            ProductVariant::updateOrCreate(
+                [
+                    'product_id' => $variantProduct->id,
+                    'size' => $variantData['size'],
+                ],
+                [
+                    'price' => $variantData['price'],
+                    'sale_price' => null,
+                    'quantity' => $variantData['quantity'],
+                    'stock' => true,
+                    'weight' => 0.1,
                 ],
             );
         }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
  
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,6 +81,38 @@ class CartController extends Controller
             'subtotal'   => $cart->subtotal(),
         ]);
     }
+
+    private function resolveVariant(Request $request, Product $product): ?ProductVariant
+    {
+        $variantId = $request->input('product_variant_id')
+            ?? $request->input('variant_id')
+            ?? $request->query('product_variant_id')
+            ?? $request->query('variant_id');
+
+        $product->loadMissing('variants:id,product_id');
+
+        if ($product->variants->isNotEmpty() && empty($variantId)) {
+            abort(response()->json([
+                'message' => 'Моля, изберете вариант на продукта.',
+            ], 422));
+        }
+
+        if (empty($variantId)) {
+            return null;
+        }
+
+        $variant = ProductVariant::where('product_id', $product->id)
+            ->whereKey($variantId)
+            ->first();
+
+        if (! $variant) {
+            abort(response()->json([
+                'message' => 'Невалиден вариант на продукта.',
+            ], 422));
+        }
+
+        return $variant;
+    }
  
     /**
      * GET /api/cart?session_id=...
@@ -102,27 +135,32 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'quantity' => 'nullable|integer|min:1',
+            'product_variant_id' => 'nullable|integer|exists:product_variants,id',
+            'variant_id' => 'nullable|integer|exists:product_variants,id',
         ]);
 
         $requestedQuantity = (int) ($validated['quantity'] ?? 1);
+        $variant = $this->resolveVariant($request, $product);
+        $stockTarget = $variant ?? $product;
 
-        if (! $product->stock || (int) $product->quantity <= 0) {
+        if (! $stockTarget->stock || (int) $stockTarget->quantity <= 0) {
             return response()->json([
                 'message' => 'Продуктът не е наличен.',
             ], 422);
         }
 
-        if ($requestedQuantity > (int) $product->quantity) {
+        if ($requestedQuantity > (int) $stockTarget->quantity) {
             return response()->json([
-                'message' => "Налични са само {$product->quantity} бр.",
+                'message' => "Налични са само {$stockTarget->quantity} бр.",
             ], 422);
         }
  
         $cart = $this->getCartService($request);
-        $cart->add($product, $requestedQuantity);
+        $cart->add($product, $requestedQuantity, $variant);
 
         $this->logCartState('Cart add', $request, $cart, [
             'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
             'added_quantity' => $requestedQuantity,
         ]);
  
@@ -137,19 +175,23 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'quantity' => 'required|integer|min:1',
+            'product_variant_id' => 'nullable|integer|exists:product_variants,id',
+            'variant_id' => 'nullable|integer|exists:product_variants,id',
         ]);
 
         $requestedQuantity = (int) $validated['quantity'];
+        $variant = $this->resolveVariant($request, $product);
+        $stockTarget = $variant ?? $product;
 
-        if (! $product->stock || (int) $product->quantity <= 0) {
+        if (! $stockTarget->stock || (int) $stockTarget->quantity <= 0) {
             return response()->json([
                 'message' => 'Продуктът не е наличен.',
             ], 422);
         }
 
-        if ($requestedQuantity > (int) $product->quantity) {
+        if ($requestedQuantity > (int) $stockTarget->quantity) {
             return response()->json([
-                'message' => "Налични са само {$product->quantity} бр.",
+                'message' => "Налични са само {$stockTarget->quantity} бр.",
             ], 422);
         }
  
@@ -158,16 +200,18 @@ class CartController extends Controller
 
         $this->logCartState('Cart update request', $request, $cart, [
             'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
             'requested_quantity' => $requestedQuantity,
             'cart_item_product_ids_before' => $beforeItems->pluck('product_id')->all(),
             'cart_item_quantities_before' => $beforeItems->pluck('quantity', 'product_id')->all(),
         ]);
 
-        $cart->update($product, $requestedQuantity);
+        $cart->update($product, $requestedQuantity, $variant);
         $response = $this->cartResponse($cart, $this->frontendCartSessionId($request));
 
         $this->logCartState('Cart update response', $request, $cart, [
             'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
             'response' => $response->getData(true),
         ]);
 
@@ -180,7 +224,7 @@ class CartController extends Controller
     public function remove(Request $request, Product $product): JsonResponse
     {
         $cart = $this->getCartService($request);
-        $cart->remove($product);
+        $cart->remove($product, $this->resolveVariant($request, $product));
  
         return $this->cartResponse($cart, $this->frontendCartSessionId($request));
     }

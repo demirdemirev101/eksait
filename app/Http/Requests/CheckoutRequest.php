@@ -36,6 +36,8 @@ class CheckoutRequest extends FormRequest
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|integer|exists:product_variants,id',
+            'items.*.variant_id' => 'nullable|integer|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
         ];
     }

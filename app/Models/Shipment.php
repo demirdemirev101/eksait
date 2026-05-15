@@ -20,6 +20,9 @@ class Shipment extends Model
         'label_url',
 
         'weight',
+        'width',
+        'height',
+        'length',
         'pack_count',
         'delivery_type',
         'office_code',
@@ -46,6 +49,9 @@ class Shipment extends Model
         'carrier_response' => 'array',
 
         'weight' => 'decimal:3',
+        'width' => 'decimal:2',
+        'height' => 'decimal:2',
+        'length' => 'decimal:2',
         'declared_value' => 'decimal:2',
         'cash_on_delivery' => 'decimal:2',
         'shipping_price_estimated' => 'decimal:2',

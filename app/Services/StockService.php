@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\CheckoutException;
 use App\Models\Product;
+use App\Models\ProductVariant;
 
 class StockService
 {
@@ -42,6 +43,39 @@ class StockService
             ->increment('quantity', $quantity);
 
         Product::where('id', $product->id)
+            ->where('quantity', '>', 0)
+            ->update(['stock' => true]);
+    }
+
+    public function reserveVariant(ProductVariant $variant, int $quantity): void
+    {
+        if (! $variant->stock || (int) $variant->quantity <= 0) {
+            throw new CheckoutException("Продуктът не е наличен: {$variant->product?->name}", 422);
+        }
+
+        $affected = ProductVariant::where('id', $variant->id)
+            ->where('stock', true)
+            ->where('quantity', '>=', $quantity)
+            ->decrement('quantity', $quantity);
+
+        if ($affected === 0) {
+            throw new CheckoutException("Недостатъчна наличност за продукт: {$variant->product?->name}", 409);
+        }
+
+        ProductVariant::where('id', $variant->id)
+            ->where('quantity', '<=', 0)
+            ->update([
+                'quantity' => 0,
+                'stock' => false,
+            ]);
+    }
+
+    public function releaseVariant(ProductVariant $variant, int $quantity): void
+    {
+        ProductVariant::where('id', $variant->id)
+            ->increment('quantity', $quantity);
+
+        ProductVariant::where('id', $variant->id)
             ->where('quantity', '>', 0)
             ->update(['stock' => true]);
     }

@@ -45,6 +45,9 @@ class CreateEcontShipment implements ShouldQueue
         $shipment = $order->shipment()->create([
             'carrier' => 'econt',
             'weight' => $weight,
+            'width'  => $this->weightCalculator->maxDimension($order, 'width'),
+            'height' => $this->weightCalculator->maxDimension($order, 'height'),
+            'length' => $this->weightCalculator->maxDimension($order, 'length'),
             'pack_count' => $this->calculatePackCount($order),
             'declared_value' => $declaredValue,
             'shipping_price_estimated' => $order->shipping_price,

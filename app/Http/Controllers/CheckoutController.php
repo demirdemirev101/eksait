@@ -10,6 +10,7 @@ use App\Http\Requests\EcontOfficesRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\CartService;
 use App\Services\Econt\EcontCityResolverService;
 use App\Services\OrderService;
@@ -69,19 +70,31 @@ class CheckoutController extends Controller
             ->whereIn('id', collect($items)->pluck('product_id')->all())
             ->get()
             ->keyBy('id');
+        $variants = ProductVariant::query()
+            ->whereIn('id', collect($items)
+                ->map(fn (array $item) => $item['product_variant_id'] ?? $item['variant_id'] ?? null)
+                ->filter()
+                ->all())
+            ->get()
+            ->keyBy('id');
 
-        return collect($items)->map(function (array $item) use ($products) {
+        return collect($items)->map(function (array $item) use ($products, $variants) {
             $product = $products->get($item['product_id']);
+            $variantId = $item['product_variant_id'] ?? $item['variant_id'] ?? null;
+            $variant = $variantId ? $variants->get($variantId) : null;
+            $variant = $variant?->product_id === $product?->id ? $variant : null;
             $quantity = (int) $item['quantity'];
-            $price = (float) ($product?->sale_price ?? $product?->price ?? 0);
+            $price = (float) ($variant?->sale_price ?? $variant?->price ?? $product?->sale_price ?? $product?->price ?? 0);
 
             $orderItem = new OrderItem([
                 'product_id' => $item['product_id'],
+                'product_variant_id' => $variant?->id,
                 'price' => $price,
                 'quantity' => $quantity,
                 'total' => $price * $quantity,
             ]);
             $orderItem->setRelation('product', $product);
+            $orderItem->setRelation('variant', $variant);
 
             return $orderItem;
         });
@@ -201,6 +214,12 @@ class CheckoutController extends Controller
             'econt_office_code' => $validated['shipping_method'] === 'address'
                 ? null
                 : ($validated['econt_office_code'] ?? null),
+            'econt_office_name' => $validated['shipping_method'] === 'address'
+                ? null
+                : ($validated['econt_office_name'] ?? null),
+            'econt_office_address' => $validated['shipping_method'] === 'address'
+                ? null
+                : ($validated['econt_office_address'] ?? null),
             'payment_method' => $validated['payment_method'] ?? null,
         ]);
         $tempOrder->setRelation('items', $effectiveItems);

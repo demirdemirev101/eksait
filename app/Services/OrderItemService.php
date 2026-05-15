@@ -4,146 +4,170 @@ namespace App\Services;
 
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
-/**
- * This service handles the creation, updating, and deletion of order items while ensuring that product stock levels are accurately maintained.
- */
 class OrderItemService
 {
     public function __construct(protected OrderService $orderService) {}
 
-    /**
-     * Create a new order item and adjust product stock accordingly. This method performs the following steps:
-     *  1. It starts a database transaction to ensure atomicity of the operation.
-     *  2. It locks the product record for update to prevent concurrent modifications to the product's stock.
-     *  3. It checks if the requested quantity is available in stock. If not, it throws an exception indicating insufficient stock.
-     *  4. It creates a new order item with the provided data and calculates the total price based on the product's price and the quantity.
-     *  5. It updates the product's stock by decrementing the quantity based on the order item quantity.
-     *  6. It recalculates the total for the associated order to reflect the new item and saves the changes to the database.
-     *  7. Finally, it returns the created order item.
-     */
     public function create(array $data): OrderItem
     {
-       return DB::transaction(function () use ($data) 
-       {
-            $product = Product::lockForUpdate()->findOrFail($data['product_id']);
+        return DB::transaction(function () use ($data) {
+            $product = Product::query()
+                ->with('variants')
+                ->lockForUpdate()
+                ->findOrFail($data['product_id']);
+            $variant = $this->resolveVariant($product, $data['product_variant_id'] ?? null);
+            $quantity = (int) ($data['quantity'] ?? 1);
 
-            $quantity = $data['quantity'] ?? null;
+            $this->decrementStock($variant ?? $product, $quantity);
 
-            if($quantity!==null && $product->quantity < $quantity) {
-                throw new \Exception('Продуктът няма наличност.');
-            }
-
-            $orderItem = new OrderItem();
-            $orderItem->order_id = $data['order_id'];
-            $orderItem->product_id = $product->id;
-            $orderItem->quantity = $quantity;
-
-            //snapshot
-            $orderItem->product_name = $product->name;
-            $orderItem->price = $product->price;
-            $orderItem->total = $quantity !==null
-                ? $product->price * $quantity
-                : $product->price;
-
-            $orderItem->save();
-
-            if($quantity!==null){
-                $product->quantity -= $quantity;
-                $product->save();
-            }
+            $price = $this->priceFor($product, $variant);
+            $orderItem = OrderItem::create([
+                'order_id' => $data['order_id'],
+                'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
+                'product_name' => $this->snapshotName($product, $variant),
+                'price' => $price,
+                'quantity' => $quantity,
+                'total' => $price * $quantity,
+            ]);
 
             $this->orderService->recalculateTotal($orderItem->order);
 
-            return $orderItem;
-       });
-    }
-    /**
-     * Update an existing order item and adjust product stock accordingly. This method performs the following steps:
-     *  1. It starts a database transaction to ensure atomicity of the operation.
-     *  2. It locks the product record for update to prevent concurrent modifications to the product's stock.
-     *  3. It checks the old and new quantities to determine how to adjust the product's stock. If the new quantity is greater than the old quantity,
-     *    it checks if the additional quantity is available in stock. If not, it throws an exception indicating insufficient stock. 
-     *    If the new quantity is less than the old quantity, it calculates the difference and adjusts the stock accordingly.
-     *  4. It updates the order item with the new quantity and recalculates the total price based on the product's price and the new quantity.
-     *  5. It saves the changes to the order item and the product, and then recalculates the total for the associated order to reflect the updated item.
-     *  6. Finally, it returns the updated order item.
-     *  
-    */
-    public function update(OrderItem $orderItem, array $data): OrderItem
-    {
-        return DB::transaction(function () use ($orderItem, $data) 
-        {
-            $product = Product::lockForUpdate()->findOrFail($orderItem->product_id);
-
-            $oldQuantity = $orderItem->quantity;
-            $newQuantity = $data['quantity'] ?? null;
-
-            //null -> number (Добавяме количество)
-            if($oldQuantity ===null && $newQuantity !== null){
-                if($product->quantity < $newQuantity){
-                    throw new \Exception('Продуктът няма наличност.');
-                }
-                $product->quantity -= $newQuantity;
-            }
-
-            //number -> null (Премахваме количество)
-            if($oldQuantity !==null && $newQuantity === null){
-                $product->quantity += $oldQuantity;
-            }
-
-            //number -> number (Променяме количество)
-            if($oldQuantity !==null && $newQuantity !== null){
-                //увеличаваме количество
-                $difference = $newQuantity - $oldQuantity;
-
-                if($difference > 0 && $product->quantity < $difference){
-                    throw new \Exception('Продуктът няма наличност.');
-                }
-                    $product->quantity -= $difference;
-            }
-
-            //Update order item
-            $orderItem->quantity = $newQuantity;
-            $orderItem->total = $newQuantity !==null
-                ? $orderItem->price * $newQuantity
-                : $orderItem->price;
-
-            $orderItem->save();
-            $product->save();
-
-            $this->orderService->recalculateTotal($orderItem->order);
             return $orderItem;
         });
     }
-    /**
-     * Delete an order item and adjust product stock accordingly. This method performs the following steps:
-     *  1. It starts a database transaction to ensure atomicity of the operation.
-     *  2. It checks if the order item has a quantity specified. If it does,
-     *   it locks the associated product record for update and increments the product's stock by the quantity of the order item being deleted.
-     *  3. It deletes the order item from the database.
-     *  4. It recalculates the total for the associated order to reflect the removed item and saves the changes to the database.
-     *  5. Finally, it completes the transaction, ensuring that all changes are applied atomically to maintain data integrity.
-     */
+
+    public function update(OrderItem $orderItem, array $data): OrderItem
+    {
+        return DB::transaction(function () use ($orderItem, $data) {
+            $orderItem->loadMissing(['product', 'variant', 'order']);
+
+            $oldTarget = $orderItem->variant ?? $orderItem->product;
+            $oldQuantity = (int) $orderItem->quantity;
+
+            $productId = (int) ($data['product_id'] ?? $orderItem->product_id);
+            $product = Product::query()
+                ->with('variants')
+                ->lockForUpdate()
+                ->findOrFail($productId);
+            $variant = $this->resolveVariant($product, $data['product_variant_id'] ?? $orderItem->product_variant_id);
+            $newQuantity = (int) ($data['quantity'] ?? $orderItem->quantity);
+            $newTarget = $variant ?? $product;
+
+            if ($oldTarget) {
+                $this->incrementStock($oldTarget, $oldQuantity);
+            }
+
+            try {
+                $this->decrementStock($newTarget, $newQuantity);
+            } catch (\Throwable $e) {
+                if ($oldTarget) {
+                    $this->decrementStock($oldTarget, $oldQuantity);
+                }
+
+                throw $e;
+            }
+
+            $price = $this->priceFor($product, $variant);
+
+            $orderItem->fill([
+                'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
+                'product_name' => $this->snapshotName($product, $variant),
+                'price' => $price,
+                'quantity' => $newQuantity,
+                'total' => $price * $newQuantity,
+            ]);
+            $orderItem->save();
+
+            $this->orderService->recalculateTotal($orderItem->order);
+
+            return $orderItem;
+        });
+    }
+
     public function delete(OrderItem $orderItem): void
     {
-        DB::transaction(function () use ($orderItem) 
-        {
-            if($orderItem->quantity !== null){
-                $product = Product::lockForUpdate()->findOrFail($orderItem->product_id);
-                if($product){
-                    $product->quantity += $orderItem->quantity;
-                    $product->save();
-                }
+        DB::transaction(function () use ($orderItem) {
+            $orderItem->loadMissing(['product', 'variant', 'order']);
+
+            $target = $orderItem->variant ?? $orderItem->product;
+            if ($target) {
+                $this->incrementStock($target, (int) $orderItem->quantity);
             }
 
             $order = $orderItem->order;
             $orderItem->delete();
 
-            if($order){
+            if ($order) {
                 $this->orderService->recalculateTotal($order);
             }
         });
+    }
+
+    private function resolveVariant(Product $product, mixed $variantId): ?ProductVariant
+    {
+        if (empty($variantId)) {
+            if ($product->variants->isNotEmpty()) {
+                throw new \Exception('Please select a product variant.');
+            }
+
+            return null;
+        }
+
+        $variant = ProductVariant::query()
+            ->where('product_id', $product->id)
+            ->lockForUpdate()
+            ->find($variantId);
+
+        if (! $variant) {
+            throw new \Exception('Invalid product variant.');
+        }
+
+        return $variant;
+    }
+
+    private function decrementStock(Model $target, int $quantity): void
+    {
+        $target->refresh();
+
+        if (! $target->stock || (int) $target->quantity < $quantity) {
+            throw new \Exception('Insufficient stock.');
+        }
+
+        $target->quantity = (int) $target->quantity - $quantity;
+        if ($target->quantity <= 0) {
+            $target->quantity = 0;
+            $target->stock = false;
+        }
+        $target->save();
+    }
+
+    private function incrementStock(Model $target, int $quantity): void
+    {
+        $target->refresh();
+        $target->quantity = (int) $target->quantity + $quantity;
+        if ($target->quantity > 0) {
+            $target->stock = true;
+        }
+        $target->save();
+    }
+
+    private function priceFor(Product $product, ?ProductVariant $variant = null): float
+    {
+        return (float) ($variant
+            ? ($variant->sale_price ?? $variant->price ?? 0)
+            : ($product->sale_price ?? $product->price ?? 0));
+    }
+
+    private function snapshotName(Product $product, ?ProductVariant $variant = null): string
+    {
+        return $variant?->size
+            ? "{$product->name} - {$variant->size}"
+            : $product->name;
     }
 }

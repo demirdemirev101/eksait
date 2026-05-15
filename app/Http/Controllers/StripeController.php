@@ -94,7 +94,7 @@ class StripeController extends Controller
             $orderId = $session->metadata->order_id ?? null;
 
             DB::transaction(function () use ($orderId, $stockService) {
-                $order = Order::with('items.product')
+                $order = Order::with(['items.product', 'items.variant'])
                     ->whereKey($orderId)
                     ->where('payment_method', 'stripe')
                     ->where('payment_status', 'pending')
@@ -111,7 +111,9 @@ class StripeController extends Controller
                 ]);
 
                 foreach ($order->items as $item) {
-                    if ($item->product) {
+                    if ($item->variant) {
+                        $stockService->releaseVariant($item->variant, (int) $item->quantity);
+                    } elseif ($item->product) {
                         $stockService->release($item->product, (int) $item->quantity);
                     }
                 }

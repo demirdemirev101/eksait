@@ -31,6 +31,8 @@ class Order extends Model
         'shipping_postcode',
         'shipping_method',
         'econt_office_code',
+        'econt_office_name',
+        'econt_office_address',
         'shipping_country',
         'holiday_delivery_day',
         'status',

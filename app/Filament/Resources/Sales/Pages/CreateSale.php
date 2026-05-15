@@ -6,19 +6,21 @@ use App\Exceptions\CheckoutException;
 use App\Filament\Resources\Sales\SaleResource;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\StockService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CreateSale extends CreateRecord
 {
     protected static string $resource = SaleResource::class;
 
-    protected static ?string $title = 'Нова продажба';
+    protected static ?string $title = 'New sale';
 
     protected static bool $canCreateAnother = false;
 
@@ -26,14 +28,14 @@ class CreateSale extends CreateRecord
 
     public function getBreadcrumb(): string
     {
-        return 'Нова продажба';
+        return 'New sale';
     }
 
-    public function addToCart(int $productId, int $quantity): void
+    public function addToCart(int $productId, int $quantity, ?int $variantId = null): void
     {
         if ($productId <= 0 || $quantity <= 0) {
             Notification::make()
-                ->title('Изберете продукт и количество')
+                ->title('Select product and quantity')
                 ->warning()
                 ->send();
 
@@ -41,64 +43,81 @@ class CreateSale extends CreateRecord
         }
 
         $product = Product::query()
+            ->with('variants')
             ->select(['id', 'name', 'price', 'sale_price', 'stock', 'quantity'])
             ->find($productId);
 
         if (! $product) {
             Notification::make()
-                ->title('Продуктът не е намерен')
+                ->title('Product not found')
                 ->danger()
                 ->send();
 
             return;
         }
 
-        $newQuantity = ($this->cart[$productId]['quantity'] ?? 0) + $quantity;
+        $variant = $this->resolveVariantForCart($product, $variantId);
+        if ($product->variants->isNotEmpty() && ! $variant) {
+            return;
+        }
 
-        if ($product->stock && $newQuantity > $product->quantity) {
+        $cartKey = $this->cartKey($product->id, $variant?->id);
+        $stockTarget = $variant ?? $product;
+        $newQuantity = ($this->cart[$cartKey]['quantity'] ?? 0) + $quantity;
+
+        if (! $stockTarget->stock || $newQuantity > (int) $stockTarget->quantity) {
             Notification::make()
-                ->title('Недостатъчна наличност')
-                ->body("Налично количество за {$product->name}: {$product->quantity}.")
+                ->title('Insufficient stock')
+                ->body("Available quantity for {$this->snapshotName($product, $variant)}: {$stockTarget->quantity}.")
                 ->warning()
                 ->send();
 
             return;
         }
 
-        $price = $this->priceFor($product);
+        $price = $this->priceFor($product, $variant);
 
-        $this->cart[$productId] = [
+        $this->cart[$cartKey] = [
             'product_id' => $product->id,
-            'name' => $product->name,
+            'product_variant_id' => $variant?->id,
+            'name' => $this->snapshotName($product, $variant),
             'price' => $price,
             'quantity' => $newQuantity,
             'total' => $price * $newQuantity,
         ];
     }
 
-    public function increaseCartItem(int $productId): void
+    public function increaseCartItem(string $cartKey): void
     {
-        $this->addToCart($productId, 1);
-    }
-
-    public function decreaseCartItem(int $productId): void
-    {
-        if (! isset($this->cart[$productId])) {
+        if (! isset($this->cart[$cartKey])) {
             return;
         }
 
-        if ($this->cart[$productId]['quantity'] <= 1) {
-            $this->removeCartItem($productId);
+        $this->addToCart(
+            productId: (int) $this->cart[$cartKey]['product_id'],
+            quantity: 1,
+            variantId: $this->cart[$cartKey]['product_variant_id'] ?? null,
+        );
+    }
+
+    public function decreaseCartItem(string $cartKey): void
+    {
+        if (! isset($this->cart[$cartKey])) {
             return;
         }
 
-        $this->cart[$productId]['quantity']--;
-        $this->cart[$productId]['total'] = $this->cart[$productId]['price'] * $this->cart[$productId]['quantity'];
+        if ($this->cart[$cartKey]['quantity'] <= 1) {
+            $this->removeCartItem($cartKey);
+            return;
+        }
+
+        $this->cart[$cartKey]['quantity']--;
+        $this->cart[$cartKey]['total'] = $this->cart[$cartKey]['price'] * $this->cart[$cartKey]['quantity'];
     }
 
-    public function removeCartItem(int $productId): void
+    public function removeCartItem(string $cartKey): void
     {
-        unset($this->cart[$productId]);
+        unset($this->cart[$cartKey]);
     }
 
     public function cartTotal(): float
@@ -117,16 +136,22 @@ class CreateSale extends CreateRecord
                 $items = collect($this->cart)
                     ->map(fn (array $item): array => [
                         'product_id' => (int) $item['product_id'],
+                        'product_variant_id' => $item['product_variant_id'] ?? null,
                         'quantity' => (int) $item['quantity'],
                     ])
                     ->values();
 
                 if ($items->isEmpty()) {
-                    throw new CheckoutException('Добавете поне един продукт.', 422);
+                    throw new CheckoutException('Add at least one product.', 422);
                 }
 
                 $products = Product::query()
+                    ->with('variants')
                     ->whereIn('id', $items->pluck('product_id'))
+                    ->get()
+                    ->keyBy('id');
+                $variants = ProductVariant::query()
+                    ->whereIn('id', $items->pluck('product_variant_id')->filter()->all())
                     ->get()
                     ->keyBy('id');
 
@@ -136,19 +161,20 @@ class CreateSale extends CreateRecord
                     $product = $products->get($item['product_id']);
 
                     if (! $product) {
-                        throw new CheckoutException('Избран продукт вече не съществува.', 422);
+                        throw new CheckoutException('Selected product no longer exists.', 422);
                     }
 
-                    $subtotal += $this->priceFor($product) * $item['quantity'];
+                    $variant = $this->variantForItem($product, $variants, $item['product_variant_id'] ?? null);
+                    $subtotal += $this->priceFor($product, $variant) * $item['quantity'];
                 }
 
                 $order = Order::create([
                     'source' => 'panel',
-                    'customer_name' => trim((string) ($data['customer_name'] ?? '')) ?: 'Клиент на място',
+                    'customer_name' => trim((string) ($data['customer_name'] ?? '')) ?: 'Walk-in customer',
                     'customer_email' => trim((string) ($data['customer_email'] ?? '')) ?: null,
                     'customer_phone' => trim((string) ($data['customer_phone'] ?? '')) ?: null,
-                    'shipping_address' => 'Продажба на място',
-                    'shipping_city' => 'Продажба на място',
+                    'shipping_address' => 'In-store sale',
+                    'shipping_city' => 'In-store sale',
                     'status' => 'completed',
                     'subtotal' => $subtotal,
                     'shipping_price' => 0,
@@ -162,14 +188,20 @@ class CreateSale extends CreateRecord
 
                 foreach ($items as $item) {
                     $product = $products->get($item['product_id']);
+                    $variant = $this->variantForItem($product, $variants, $item['product_variant_id'] ?? null);
                     $quantity = $item['quantity'];
-                    $price = $this->priceFor($product);
+                    $price = $this->priceFor($product, $variant);
 
-                    $stockService->reserve($product, $quantity);
+                    if ($variant) {
+                        $stockService->reserveVariant($variant, $quantity);
+                    } else {
+                        $stockService->reserve($product, $quantity);
+                    }
 
                     $order->items()->create([
                         'product_id' => $product->id,
-                        'product_name' => $product->name,
+                        'product_variant_id' => $variant?->id,
+                        'product_name' => $this->snapshotName($product, $variant),
                         'price' => $price,
                         'quantity' => $quantity,
                         'total' => $price * $quantity,
@@ -180,7 +212,7 @@ class CreateSale extends CreateRecord
             });
         } catch (CheckoutException $e) {
             Notification::make()
-                ->title('Продажбата не може да бъде завършена')
+                ->title('Sale cannot be completed')
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -192,14 +224,14 @@ class CreateSale extends CreateRecord
     protected function getCreatedNotification(): ?Notification
     {
         return Notification::make()
-            ->title('Продажбата е създадена успешно')
+            ->title('Sale created successfully')
             ->success();
     }
 
     protected function getCreateFormAction(): Action
     {
         return parent::getCreateFormAction()
-            ->label('Завърши продажбата');
+            ->label('Complete sale');
     }
 
     protected function getRedirectUrl(): string
@@ -207,8 +239,66 @@ class CreateSale extends CreateRecord
         return SaleResource::getUrl('index');
     }
 
-    private function priceFor(Product $product): float
+    private function resolveVariantForCart(Product $product, ?int $variantId): ?ProductVariant
     {
-        return (float) ($product->sale_price ?: $product->price ?: 0);
+        if (! $variantId) {
+            if ($product->variants->isNotEmpty()) {
+                Notification::make()
+                    ->title('Select a variant')
+                    ->warning()
+                    ->send();
+            }
+
+            return null;
+        }
+
+        $variant = $product->variants->firstWhere('id', $variantId);
+
+        if (! $variant) {
+            Notification::make()
+                ->title('Invalid variant')
+                ->danger()
+                ->send();
+        }
+
+        return $variant;
+    }
+
+    private function variantForItem(Product $product, Collection $variants, mixed $variantId): ?ProductVariant
+    {
+        if (empty($variantId)) {
+            if ($product->variants->isNotEmpty()) {
+                throw new CheckoutException("Select a variant for {$product->name}.", 422);
+            }
+
+            return null;
+        }
+
+        $variant = $variants->get($variantId);
+
+        if (! $variant || $variant->product_id !== $product->id) {
+            throw new CheckoutException("Invalid variant for {$product->name}.", 422);
+        }
+
+        return $variant;
+    }
+
+    private function priceFor(Product $product, ?ProductVariant $variant = null): float
+    {
+        return (float) ($variant
+            ? ($variant->sale_price ?: $variant->price ?: 0)
+            : ($product->sale_price ?: $product->price ?: 0));
+    }
+
+    private function snapshotName(Product $product, ?ProductVariant $variant = null): string
+    {
+        return $variant?->size
+            ? "{$product->name} - {$variant->size}"
+            : $product->name;
+    }
+
+    private function cartKey(int $productId, ?int $variantId = null): string
+    {
+        return $productId . ':' . ($variantId ?? 'none');
     }
 }

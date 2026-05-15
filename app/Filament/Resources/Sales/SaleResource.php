@@ -6,6 +6,7 @@ use App\Filament\Resources\Sales\Pages\CreateSale;
 use App\Filament\Resources\Sales\Pages\ListSales;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -58,8 +59,29 @@ class SaleResource extends Resource
                                 ->all())
                             ->searchable()
                             ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn ($set) => $set('product_variant_id', null))
                             ->dehydrated(false)
-                            ->columnSpan(['default' => 12, 'lg' => 7]),
+                            ->columnSpan(['default' => 12, 'lg' => 5]),
+
+                        Select::make('product_variant_id')
+                            ->label('Variant')
+                            ->options(fn ($get): array => ProductVariant::query()
+                                ->where('product_id', $get('product_id'))
+                                ->orderBy('size')
+                                ->pluck('size', 'id')
+                                ->all())
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->visible(fn ($get): bool => filled($get('product_id')) && ProductVariant::query()
+                                ->where('product_id', $get('product_id'))
+                                ->exists())
+                            ->required(fn ($get): bool => filled($get('product_id')) && ProductVariant::query()
+                                ->where('product_id', $get('product_id'))
+                                ->exists())
+                            ->dehydrated(false)
+                            ->columnSpan(['default' => 12, 'lg' => 2]),
 
                         TextInput::make('quantity')
                             ->label('Количество')
@@ -79,9 +101,11 @@ class SaleResource extends Resource
                                     $livewire->addToCart(
                                         productId: (int) $get('product_id'),
                                         quantity: (int) ($get('quantity') ?: 1),
+                                        variantId: $get('product_variant_id') ? (int) $get('product_variant_id') : null,
                                     );
 
                                     $set('product_id', null);
+                                    $set('product_variant_id', null);
                                     $set('quantity', 1);
                                 }),
                         ])

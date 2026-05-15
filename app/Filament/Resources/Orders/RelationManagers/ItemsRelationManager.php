@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\ProductVariant;
 use App\Services\OrderItemService;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -67,7 +68,26 @@ class ItemsRelationManager extends RelationManager
                     ->label('Продукт')
                     ->relationship('product', 'name')
                     ->required()
-                    ->preload(),
+                    ->preload()
+                    ->live()
+                    ->afterStateUpdated(fn ($set) => $set('product_variant_id', null)),
+
+                Select::make('product_variant_id')
+                    ->label('Variant')
+                    ->options(fn ($get): array => ProductVariant::query()
+                        ->where('product_id', $get('product_id'))
+                        ->orderBy('size')
+                        ->pluck('size', 'id')
+                        ->all())
+                    ->searchable()
+                    ->preload()
+                    ->nullable()
+                    ->visible(fn ($get): bool => filled($get('product_id')) && ProductVariant::query()
+                        ->where('product_id', $get('product_id'))
+                        ->exists())
+                    ->required(fn ($get): bool => filled($get('product_id')) && ProductVariant::query()
+                        ->where('product_id', $get('product_id'))
+                        ->exists()),
 
                 TextInput::make('quantity')
                     ->label('Количество')
@@ -86,6 +106,10 @@ class ItemsRelationManager extends RelationManager
                     ->label('Продукт')
                     ->searchable()
                     ->sortable(),
+
+                TextColumn::make('variant.size')
+                    ->label('Variant')
+                    ->placeholder('-'),
 
                 TextColumn::make('price')
                     ->label('Цена')
@@ -122,6 +146,7 @@ class ItemsRelationManager extends RelationManager
                         return app(OrderItemService::class)->create([
                             'order_id' => $this->ownerRecord->id,
                             'product_id' => $data['product_id'],
+                            'product_variant_id' => $data['product_variant_id'] ?? null,
                             'quantity' => $data['quantity'],
                         ]);
                     })
@@ -139,6 +164,8 @@ class ItemsRelationManager extends RelationManager
                 EditAction::make()
                     ->using(function (OrderItem $record, array $data) {
                         return app(OrderItemService::class)->update($record, [
+                            'product_id' => $data['product_id'] ?? $record->product_id,
+                            'product_variant_id' => $data['product_variant_id'] ?? null,
                             'quantity' => $data['quantity'],
                         ]);
                     })
