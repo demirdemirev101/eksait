@@ -103,13 +103,27 @@ class CartController extends Controller
         $validated = $request->validate([
             'quantity' => 'nullable|integer|min:1',
         ]);
+
+        $requestedQuantity = (int) ($validated['quantity'] ?? 1);
+
+        if (! $product->stock || (int) $product->quantity <= 0) {
+            return response()->json([
+                'message' => 'Продуктът не е наличен.',
+            ], 422);
+        }
+
+        if ($requestedQuantity > (int) $product->quantity) {
+            return response()->json([
+                'message' => "Налични са само {$product->quantity} бр.",
+            ], 422);
+        }
  
         $cart = $this->getCartService($request);
-        $cart->add($product, (int) ($validated['quantity'] ?? 1));
+        $cart->add($product, $requestedQuantity);
 
         $this->logCartState('Cart add', $request, $cart, [
             'product_id' => $product->id,
-            'added_quantity' => (int) ($validated['quantity'] ?? 1),
+            'added_quantity' => $requestedQuantity,
         ]);
  
         return $this->cartResponse($cart, $this->frontendCartSessionId($request));
@@ -124,18 +138,32 @@ class CartController extends Controller
         $validated = $request->validate([
             'quantity' => 'required|integer|min:1',
         ]);
+
+        $requestedQuantity = (int) $validated['quantity'];
+
+        if (! $product->stock || (int) $product->quantity <= 0) {
+            return response()->json([
+                'message' => 'Продуктът не е наличен.',
+            ], 422);
+        }
+
+        if ($requestedQuantity > (int) $product->quantity) {
+            return response()->json([
+                'message' => "Налични са само {$product->quantity} бр.",
+            ], 422);
+        }
  
         $cart = $this->getCartService($request);
         $beforeItems = $cart->items();
 
         $this->logCartState('Cart update request', $request, $cart, [
             'product_id' => $product->id,
-            'requested_quantity' => (int) $validated['quantity'],
+            'requested_quantity' => $requestedQuantity,
             'cart_item_product_ids_before' => $beforeItems->pluck('product_id')->all(),
             'cart_item_quantities_before' => $beforeItems->pluck('quantity', 'product_id')->all(),
         ]);
 
-        $cart->update($product, (int) $validated['quantity']);
+        $cart->update($product, $requestedQuantity);
         $response = $this->cartResponse($cart, $this->frontendCartSessionId($request));
 
         $this->logCartState('Cart update response', $request, $cart, [

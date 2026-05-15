@@ -41,6 +41,9 @@ class CartService
                 ->where('product_id', $product->id)
                 ->first();
 
+            $totalQuantity = $quantity + (int) ($item?->quantity ?? 0);
+            $this->ensureProductQuantityAvailable($product, $totalQuantity);
+
             $price = $product->sale_price ?? $product->price;
 
             if ($item) {
@@ -65,6 +68,8 @@ class CartService
                 'quantity' => 'The quantity must be at least 1.',
             ]);
         }
+
+        $this->ensureProductQuantityAvailable($product, $quantity);
 
         $price = $product->sale_price ?? $product->price;
 
@@ -170,5 +175,22 @@ class CartService
     public function hasGuestCart(): bool
     {
         return Cart::where('session_id', $this->sessionId)->exists();
+    }
+
+    private function ensureProductQuantityAvailable(Product $product, int $quantity): void
+    {
+        $product->refresh();
+
+        if (! $product->stock || (int) $product->quantity <= 0) {
+            throw ValidationException::withMessages([
+                'product' => 'Продуктът не е наличен.',
+            ]);
+        }
+
+        if ($quantity > (int) $product->quantity) {
+            throw ValidationException::withMessages([
+                'quantity' => "Налични са само {$product->quantity} бр.",
+            ]);
+        }
     }
 }
