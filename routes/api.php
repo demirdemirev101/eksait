@@ -9,6 +9,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\StripeController;
 use App\Http\Controllers\OrdersController;
 
+Route::get('/products/search', [ProductApiController::class, 'search']);
 Route::get('/products', [ProductApiController::class, 'index']);
 Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
 
