@@ -15,7 +15,7 @@ class OrderReturnRequestedMail extends Mailable
 
     public function __construct(public int $orderId)
     {
-        $this->order = Order::with('items')->findOrFail($orderId);
+        $this->order = Order::with(['items.product', 'items.variant'])->findOrFail($orderId);
     }
 
     public function build()

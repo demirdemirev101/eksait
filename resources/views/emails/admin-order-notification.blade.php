@@ -30,9 +30,13 @@
             </thead>
             <tbody>
                 @foreach ($order->items as $item)
+                    @php
+                        $itemName = $item->product_name
+                            ?: trim(($item->product?->name ?? 'Продукт') . ($item->variant?->size ? ' - ' . $item->variant->size : ''));
+                    @endphp
                     <tr>
                         <td>
-                            <div class="item-name">{{ $item->product_name }}</div>
+                            <div class="item-name">{{ $itemName }}</div>
                             <div class="item-meta">{{ $item->quantity }} бр. x {{ number_format($item->price, 2) }} €</div>
                         </td>
                         <td style="text-align: right; white-space: nowrap;">{{ number_format($item->total, 2) }} €</td>
