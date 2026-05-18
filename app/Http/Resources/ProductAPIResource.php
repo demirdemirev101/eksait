@@ -19,6 +19,7 @@ class ProductAPIResource extends JsonResource
         $availableVariants = $hasVariants
             ? $variants->filter(fn ($variant) => (bool) $variant->stock && (int) $variant->quantity > 0)
             : collect();
+        $relatedProducts = $this->whenLoaded('relatedProducts');
 
         return [
             'id' => $this->id,
@@ -49,6 +50,23 @@ class ProductAPIResource extends JsonResource
                     'height' => $variant->height !== null ? number_format((float) $variant->height, 2, '.', '') : null,
                     'length' => $variant->length !== null ? number_format((float) $variant->length, 2, '.', '') : null,
                 ])->values()
+                : [],
+            'related_products' => $relatedProducts instanceof \Illuminate\Support\Collection
+                ? $relatedProducts->map(function ($related) {
+                    $imagePath = $related->primaryImage?->image_path
+                        ?? $related->images?->first()?->image_path;
+
+                    return [
+                        'id' => $related->id,
+                        'name' => $related->name,
+                        'slug' => $related->slug,
+                        'price' => number_format((float) $related->price, 2, '.', ''),
+                        'sale_price' => $related->sale_price ? number_format((float) $related->sale_price, 2, '.', '') : null,
+                        'stock' => (bool) $related->stock && (int) $related->quantity > 0,
+                        'image_path' => $imagePath,
+                        'image_url' => $imagePath ? asset('storage/' . $imagePath) : null,
+                    ];
+                })->values()
                 : [],
             'images' => $this->images->map(function ($image) {
                 return [
