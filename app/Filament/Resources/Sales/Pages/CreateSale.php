@@ -20,7 +20,7 @@ class CreateSale extends CreateRecord
 {
     protected static string $resource = SaleResource::class;
 
-    protected static ?string $title = 'New sale';
+    protected static ?string $title = 'Нова продажба';
 
     protected static bool $canCreateAnother = false;
 
@@ -28,14 +28,14 @@ class CreateSale extends CreateRecord
 
     public function getBreadcrumb(): string
     {
-        return 'New sale';
+        return 'Нова продажба';
     }
 
     public function addToCart(int $productId, int $quantity, ?int $variantId = null): void
     {
         if ($productId <= 0 || $quantity <= 0) {
             Notification::make()
-                ->title('Select product and quantity')
+                ->title('Изберете валиден продукт и количество')
                 ->warning()
                 ->send();
 
@@ -49,7 +49,7 @@ class CreateSale extends CreateRecord
 
         if (! $product) {
             Notification::make()
-                ->title('Product not found')
+                ->title('Продуктът не съществува')
                 ->danger()
                 ->send();
 
@@ -67,8 +67,8 @@ class CreateSale extends CreateRecord
 
         if (! $stockTarget->stock || $newQuantity > (int) $stockTarget->quantity) {
             Notification::make()
-                ->title('Insufficient stock')
-                ->body("Available quantity for {$this->snapshotName($product, $variant)}: {$stockTarget->quantity}.")
+                ->title('Недостатъчно количество на склад')
+                ->body("Недостъпно количество за {$this->snapshotName($product, $variant)}: {$stockTarget->quantity}.")
                 ->warning()
                 ->send();
 
@@ -142,7 +142,7 @@ class CreateSale extends CreateRecord
                     ->values();
 
                 if ($items->isEmpty()) {
-                    throw new CheckoutException('Add at least one product.', 422);
+                    throw new CheckoutException('Добавете поне един продукт.', 422);
                 }
 
                 $products = Product::query()
@@ -161,7 +161,7 @@ class CreateSale extends CreateRecord
                     $product = $products->get($item['product_id']);
 
                     if (! $product) {
-                        throw new CheckoutException('Selected product no longer exists.', 422);
+                        throw new CheckoutException('Избраният продукт вече не съществува.', 422);
                     }
 
                     $variant = $this->variantForItem($product, $variants, $item['product_variant_id'] ?? null);
@@ -212,7 +212,7 @@ class CreateSale extends CreateRecord
             });
         } catch (CheckoutException $e) {
             Notification::make()
-                ->title('Sale cannot be completed')
+                ->title('Продажбата не може да бъде завършена')
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -224,14 +224,14 @@ class CreateSale extends CreateRecord
     protected function getCreatedNotification(): ?Notification
     {
         return Notification::make()
-            ->title('Sale created successfully')
+            ->title('Продажбата е създадена успешно')
             ->success();
     }
 
     protected function getCreateFormAction(): Action
     {
         return parent::getCreateFormAction()
-            ->label('Complete sale');
+            ->label('Завърши продажбата');
     }
 
     protected function getRedirectUrl(): string
@@ -244,7 +244,7 @@ class CreateSale extends CreateRecord
         if (! $variantId) {
             if ($product->variants->isNotEmpty()) {
                 Notification::make()
-                    ->title('Select a variant')
+                    ->title('Изберете вариант')
                     ->warning()
                     ->send();
             }
@@ -256,7 +256,7 @@ class CreateSale extends CreateRecord
 
         if (! $variant) {
             Notification::make()
-                ->title('Invalid variant')
+                ->title('Невалиден вариант')
                 ->danger()
                 ->send();
         }
@@ -268,7 +268,7 @@ class CreateSale extends CreateRecord
     {
         if (empty($variantId)) {
             if ($product->variants->isNotEmpty()) {
-                throw new CheckoutException("Select a variant for {$product->name}.", 422);
+                throw new CheckoutException("Изберете вариант за {$product->name}.", 422);
             }
 
             return null;
@@ -277,7 +277,7 @@ class CreateSale extends CreateRecord
         $variant = $variants->get($variantId);
 
         if (! $variant || $variant->product_id !== $product->id) {
-            throw new CheckoutException("Invalid variant for {$product->name}.", 422);
+            throw new CheckoutException("Невалиден вариант за {$product->name}.", 422);
         }
 
         return $variant;

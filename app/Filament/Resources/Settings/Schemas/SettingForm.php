@@ -2,8 +2,6 @@
 
 namespace App\Filament\Resources\Settings\Schemas;
 
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
@@ -33,37 +31,6 @@ class SettingForm
                         ]),
                     ])
                     ->columnSpanFull(),
-
-                Section::make('Банер на начална страница')
-                    ->schema([
-                        Grid::make(2)->schema([
-                            TextInput::make('home_banner_eyebrow')
-                                ->label('Надзаглавие')
-                                ->maxLength(255),
-                            TextInput::make('home_banner_title')
-                                ->label('Заглавие')
-                                ->maxLength(255),
-                            Textarea::make('home_banner_subtitle')
-                                ->label('Подзаглавие')
-                                ->rows(3)
-                                ->columnSpanFull(),
-                            TextInput::make('home_banner_button_text')
-                                ->label('Текст на бутона')
-                                ->maxLength(255),
-                            TextInput::make('home_banner_button_url')
-                                ->label('Линк на бутона')
-                                ->maxLength(255),
-                            FileUpload::make('home_banner_image')
-                                ->label('Изображение за банера')
-                                ->image()
-                                ->disk('public')
-                                ->directory('banners')
-                                ->visibility('public')
-                                ->columnSpanFull(),
-                        ]),
-                    ])
-                    ->columnSpanFull(),
             ]);
     }
 }
-

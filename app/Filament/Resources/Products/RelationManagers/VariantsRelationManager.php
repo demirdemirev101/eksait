@@ -10,6 +10,8 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -27,51 +29,79 @@ class VariantsRelationManager extends RelationManager
     {
         return $schema
             ->components([
-                TextInput::make('size')
-                    ->label('Размер')
-                    ->required()
-                    ->maxLength(255),
-                TextInput::make('price')
-                    ->label('Цена')
-                    ->numeric()
-                    ->prefix('EUR')
-                    ->required(),
-                TextInput::make('sale_price')
-                    ->label('Цена с отстъпка')
-                    ->numeric()
-                    ->prefix('EUR')
-                    ->nullable(),
-                Toggle::make('stock')
-                    ->label('Налично')
-                    ->default(true)
-                    ->required(),
-                TextInput::make('quantity')
-                    ->label('Количество')
-                    ->numeric()
-                    ->integer()
-                    ->minValue(0)
-                    ->default(0)
-                    ->required(),
-                TextInput::make('weight')
-                    ->label('Тегло')
-                    ->numeric()
-                    ->suffix('kg')
-                    ->nullable(),
-                TextInput::make('width')
-                    ->label('Ширина')
-                    ->numeric()
-                    ->suffix('cm')
-                    ->nullable(),
-                TextInput::make('height')
-                    ->label('Височина')
-                    ->numeric()
-                    ->suffix('cm')
-                    ->nullable(),
-                TextInput::make('length')
-                    ->label('Дължина')
-                    ->numeric()
-                    ->suffix('cm')
-                    ->nullable(),
+                Section::make('Основни данни')
+                    ->schema([
+                        Grid::make(3)->schema([
+                            TextInput::make('size')
+                                ->label('Размер')
+                                ->required()
+                                ->maxLength(255),
+                            TextInput::make('price')
+                                ->label('Цена')
+                                ->numeric()
+                                ->prefix('EUR')
+                                ->required(),
+                            TextInput::make('sale_price')
+                                ->label('Цена с отстъпка')
+                                ->numeric()
+                                ->prefix('EUR')
+                                ->nullable(),
+                        ]),
+                    ])
+                    ->columnSpanFull(),
+
+                Section::make('Наличност')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Toggle::make('stock')
+                                ->label('Следи наличност')
+                                ->default(true)
+                                ->reactive()
+                                ->afterStateUpdated(function ($state, callable $set): void {
+                                    if ($state === false) {
+                                        $set('quantity', null);
+                                    }
+                                })
+                                ->required(),
+                            TextInput::make('quantity')
+                                ->label('Количество')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->default(0)
+                                ->reactive()
+                                ->visible(fn ($get) => $get('stock') === true)
+                                ->required(),
+                        ]),
+                    ])
+                    ->columnSpanFull(),
+
+                Section::make('Размери и тегло')
+                    ->schema([
+                        Grid::make(4)->schema([
+                            TextInput::make('weight')
+                                ->label('Тегло')
+                                ->numeric()
+                                ->suffix('kg')
+                                ->nullable(),
+                            TextInput::make('height')
+                                ->label('Височина')
+                                ->numeric()
+                                ->suffix('cm')
+                                ->nullable(),
+                            TextInput::make('width')
+                                ->label('Ширина')
+                                ->numeric()
+                                ->suffix('cm')
+                                ->nullable(),
+                            TextInput::make('length')
+                                ->label('Дължина')
+                                ->numeric()
+                                ->suffix('cm')
+                                ->nullable(),
+                        ]),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -94,7 +124,7 @@ class VariantsRelationManager extends RelationManager
                     ->placeholder('-')
                     ->sortable(),
                 IconColumn::make('stock')
-                    ->label('Налично')
+                    ->label('Наличнот')
                     ->boolean(),
                 TextColumn::make('quantity')
                     ->label('Количество')
@@ -123,3 +153,4 @@ class VariantsRelationManager extends RelationManager
             ]);
     }
 }
+

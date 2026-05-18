@@ -34,4 +34,18 @@ class ProductVariant extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $variant): void {
+            // Quantity cannot be negative.
+            $variant->quantity = max(0, (int) $variant->quantity);
+
+            // If quantity is zero, variant must be out of stock.
+            // Keep manual override possible for quantity > 0.
+            if ($variant->quantity === 0) {
+                $variant->stock = false;
+            }
+        });
+    }
 }

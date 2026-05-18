@@ -173,5 +173,9 @@ class DatabaseSeeder extends Seeder
                 'free_delivery_over' => 100,
             ],
         );
+
+        $this->call([
+            HomeBannerSeeder::class,
+        ]);
     }
 }
