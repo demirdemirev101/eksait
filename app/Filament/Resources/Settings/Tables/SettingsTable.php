@@ -2,15 +2,10 @@
 
 namespace App\Filament\Resources\Settings\Tables;
 
-use App\Filament\Resources\Settings\SettingResource;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Illuminate\Support\Facades\Auth;
+use Filament\Tables\Table;
 
 class SettingsTable
 {
@@ -27,17 +22,13 @@ class SettingsTable
                     ->falseColor('danger'),
                 TextColumn::make('free_delivery_over')
                     ->label('Безплатна доставка над')
-                    ->money('EUR', 0.00)
-                    ->disabled(fn ($get) => $get('delivery_enabled') === false),
+                    ->money('EUR', 0.00),
             ])
             ->filters([
                 //
             ])
             ->recordActions([
-                EditAction::make()
-                    ->label('Редактирай'),
-                DeleteAction::make()
-                    ->label('Изтрий'),
+                EditAction::make()->label('Редактирай'),
             ])
             ->toolbarActions([
                 //

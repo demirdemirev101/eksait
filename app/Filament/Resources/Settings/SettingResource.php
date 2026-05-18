@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Settings;
 
-use App\Filament\Resources\Settings\Pages\CreateSetting;
 use App\Filament\Resources\Settings\Pages\EditSetting;
 use App\Filament\Resources\Settings\Pages\ListSettings;
 use App\Filament\Resources\Settings\Schemas\SettingForm;
@@ -11,9 +10,7 @@ use App\Models\Setting;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class SettingResource extends Resource
@@ -23,8 +20,11 @@ class SettingResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = 'uni-setting-o';
 
     protected static string|UnitEnum|null $navigationGroup = 'Администрация';
+
     protected static ?string $navigationLabel = 'Настройки на магазина';
-    protected static ?string $modelLabel = 'настройки';
+
+    protected static ?string $modelLabel = 'настройка';
+
     protected static ?string $pluralModelLabel = 'Настройки';
 
     public static function form(Schema $schema): Schema
@@ -48,7 +48,6 @@ class SettingResource extends Resource
     {
         return [
             'index' => ListSettings::route('/'),
-            'create' => CreateSetting::route('/create'),
             'edit' => EditSetting::route('/{record}/edit'),
         ];
     }

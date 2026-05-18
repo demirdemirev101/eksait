@@ -18,6 +18,12 @@ class Setting extends Model
         'delivery_price',
         'free_delivery_over',
         'delivery_enabled',
+        'home_banner_eyebrow',
+        'home_banner_title',
+        'home_banner_subtitle',
+        'home_banner_button_text',
+        'home_banner_button_url',
+        'home_banner_image',
     ];
     /** 
      * Retrieve the current application settings. If no settings exist, create a new default instance.

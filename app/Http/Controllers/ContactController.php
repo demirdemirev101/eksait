@@ -13,19 +13,19 @@ class ContactController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $user= $request->user();
+        $user = $request->user();
 
         $validated = $request->validate([
-            'name' => $user ? 'nullable|string|max:255' : 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'email' => $user ? 'nullable|email|max:255' : 'required|email|max:255',
+            'name' => $user ? 'sometimes' : 'required|string|max:255',
+            'phone' => $user ? 'sometimes' : 'nullable|string|max:20',
+            'email' => $user ? 'sometimes' : 'required|email|max:255',
             'message' => 'required|string|max:2000',
         ]);
 
         if ($user) {
-            $validated['name']  = $validated['name']  ?? $user->name;
-            $validated['email'] = $validated['email'] ?? $user->email;
-            $validated['phone'] = $validated['phone'] ?? $user->phone ?? null;
+            $validated['name'] = $user->name;
+            $validated['email'] = $user->email;
+            $validated['phone'] = $user->phone;
         }
 
         $contact = Contact::create($validated);

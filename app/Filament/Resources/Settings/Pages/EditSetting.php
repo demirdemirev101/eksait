@@ -3,12 +3,13 @@
 namespace App\Filament\Resources\Settings\Pages;
 
 use App\Filament\Resources\Settings\SettingResource;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditSetting extends EditRecord
 {
     protected static string $resource = SettingResource::class;
+
+    protected static ?string $title = 'Редакция на настройка';
 
     protected function getHeaderActions(): array
     {
