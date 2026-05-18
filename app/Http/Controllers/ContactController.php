@@ -11,9 +11,6 @@ use Illuminate\Support\Facades\Mail;
 
 class ContactController extends Controller
 {
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request): JsonResponse
     {
         $user= $request->user();
@@ -22,7 +19,7 @@ class ContactController extends Controller
             'name' => $user ? 'nullable|string|max:255' : 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'email' => $user ? 'nullable|email|max:255' : 'required|email|max:255',
-            'message' => 'required|string',
+            'message' => 'required|string|max:2000',
         ]);
 
         if ($user) {

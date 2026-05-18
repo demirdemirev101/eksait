@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -47,6 +49,16 @@ class AuthController extends Controller
             'remember' => ['sometimes', 'boolean'],
         ]);
 
+        $key = Str::lower($validated['email'] . '|' . $request->ip());
+
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            return response()->json([
+                'message' => "Твърде много неуспешни опити за вписване. Моля, опитайте отново след {$seconds} секунди."
+            ], 429);
+        }
+
         $user = null;
 
         if (isset($validated['email'])) {
@@ -54,12 +66,15 @@ class AuthController extends Controller
         }
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+            RateLimiter::hit($key, 60);
+            return response()->json(['message' => 'Невалидни потребителски данни'], 401);
         }
 
         $sessionId = $this->cartSessionId($request);
 
         Auth::setUser($user);
+
+        RateLimiter::clear($key);
 
         if (! empty($sessionId)) {
             Log::info('Login with cart session id', [

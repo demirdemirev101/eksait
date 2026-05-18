@@ -26,7 +26,8 @@ Route::middleware('optional.sanctum')->group(function () {
     Route::post('/checkout/calculate-shipping', [CheckoutController::class, 'calculateShipping']);
 });
 
-Route::post('/contact', [ContactController::class, 'store']);
+Route::post('/contact', [ContactController::class, 'store'])
+    ->middleware('throttle:contact');
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
