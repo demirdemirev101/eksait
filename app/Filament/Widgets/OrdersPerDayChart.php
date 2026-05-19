@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 class OrdersPerDayChart extends ChartWidget
 {
+    protected static bool $isDiscovered = false;
+
     protected ?string $heading = 'Поръчки за деня';
     protected static ?int $sort = 1;
 
@@ -23,7 +25,7 @@ class OrdersPerDayChart extends ChartWidget
             'labels' => $days->map(fn (Carbon $day) => $day->format('d M'))->all(),
             'datasets' => [
                 [
-                    'label' => 'Orders',
+                    'label' => 'Поръчки',
                     'data' => $days->map(fn (Carbon $day) => $counts[$day->toDateString()] ?? 0)->all(),
                     'borderColor' => '#f59e0b',
                     'backgroundColor' => 'rgba(245, 158, 11, 0.2)',

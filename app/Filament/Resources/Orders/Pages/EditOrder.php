@@ -15,7 +15,9 @@ use App\Policies\ShipmentPollingPolicy;
 use App\Services\Econt\EcontService;
 use App\Services\Shipment\ShipmentCancellationService;
 use App\Services\Shipment\ShipmentTrackingSyncService;
+use App\Services\StripeRefundService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Mail;
@@ -157,7 +159,8 @@ class EditOrder extends EditRecord
                 ->label('Откажи поръчка')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
-                ->visible(fn () => app(CancelOrderPolicy::class)->canCancelOrder($this->record))
+                ->visible(fn () => $this->record->payment_method !== 'stripe'
+                    && app(CancelOrderPolicy::class)->canCancelOrder($this->record))
                 ->requiresConfirmation()
                 ->modalHeading('Отказ на поръчка')
                 ->modalDescription('Сигурни ли сте, че искате да откажете поръчката?')
@@ -219,7 +222,8 @@ class EditOrder extends EditRecord
                 ->label('Заяви връщане')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('warning')
-                ->visible(fn () => app(CancelOrderPolicy::class)->canRequestReturn($this->record))
+                ->visible(fn () => $this->record->payment_method !== 'stripe'
+                    && app(CancelOrderPolicy::class)->canRequestReturn($this->record))
                 ->requiresConfirmation()
                 ->modalHeading('Заявка за връщане')
                 ->modalDescription('Сигурни ли сте, че искате да заявите връщане на поръчката?')
@@ -239,6 +243,55 @@ class EditOrder extends EditRecord
                         ->send();
 
                     $this->refreshUi();
+                }),
+            Action::make('refund_stripe_payment')
+                ->label('Върни плащане Stripe')
+                ->icon('heroicon-o-arrow-path-rounded-square')
+                ->color('danger')
+                ->visible(fn () => $this->record->payment_method === 'stripe'
+                    && in_array($this->record->payment_status, [
+                        PaymentStatus::PAID->value,
+                        PaymentStatus::PARTIALLY_REFUNDED->value,
+                    ], true)
+                    && filled($this->record->stripe_payment_intent_id)
+                    && (float) $this->record->refunded_amount < (float) $this->record->total)
+                ->schema([
+                    TextInput::make('amount')
+                        ->label('Сума за връщане')
+                        ->prefix('EUR')
+                        ->numeric()
+                        ->minValue(0.01)
+                        ->maxValue(fn () => max(0.01, (float) $this->record->total - (float) $this->record->refunded_amount))
+                        ->default(fn () => number_format(
+                            max(0, (float) $this->record->total - (float) $this->record->refunded_amount),
+                            2,
+                            '.',
+                            '',
+                        ))
+                        ->required(),
+                ])
+                ->requiresConfirmation()
+                ->modalHeading('Връщане на Stripe плащане')
+                ->modalDescription('Сумата ще бъде върната през Stripe. При пълно връщане поръчката ще бъде маркирана като върната.')
+                ->modalSubmitActionLabel('Върни сумата')
+                ->action(function (array $data) {
+                    try {
+                        app(StripeRefundService::class)->refund($this->record, (float) $data['amount']);
+
+                        Notification::make()
+                            ->success()
+                            ->title('Stripe refund е изпратен')
+                            ->body('Статусът на поръчката беше обновен.')
+                            ->send();
+
+                        $this->refreshUi();
+                    } catch (\Throwable $e) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Stripe refund неуспешен')
+                            ->body($e->getMessage())
+                            ->send();
+                    }
                 }),
         ];
     }

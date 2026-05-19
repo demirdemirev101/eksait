@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
@@ -9,23 +10,26 @@ use Illuminate\Support\Facades\DB;
 
 class RevenuePerDayChart extends ChartWidget
 {
-    protected ?string $heading = 'Печалби за деня';
+    protected ?string $heading = 'Приходи за последните 30 дни';
+
     protected ?string $pollingInterval = '100s';
-    
+
     protected int | string | array $columnSpan = 'full';
-    protected static ?int $sort = 3;
+
+    protected static ?int $sort = 2;
+
     protected ?string $maxHeight = '300px';
 
     protected function getData(): array
     {
-        $days = $this->lastDays(14);
+        $days = $this->lastDays(30);
         $totals = $this->totalsByDay($days);
 
         return [
             'labels' => $days->map(fn (Carbon $day) => $day->format('d M'))->all(),
             'datasets' => [
                 [
-                    'label' => 'Revenue',
+                    'label' => 'Приходи',
                     'data' => $days->map(fn (Carbon $day) => (float) ($totals[$day->toDateString()] ?? 0))->all(),
                     'borderColor' => '#10b981',
                     'backgroundColor' => 'rgba(16, 185, 129, 0.2)',
@@ -59,6 +63,12 @@ class RevenuePerDayChart extends ChartWidget
 
         return Order::query()
             ->whereBetween('created_at', [$start, $end])
+            ->whereNotIn('status', [
+                OrderStatus::CANCELLED->value,
+                OrderStatus::RETURN_REQUESTED->value,
+                OrderStatus::RETURNED->value,
+            ])
+            ->whereNotIn('payment_status', ['failed', 'partially_refunded', 'refunded'])
             ->selectRaw('DATE(created_at) as day, COALESCE(SUM(total), 0) as total')
             ->groupBy(DB::raw('DATE(created_at)'))
             ->pluck('total', 'day')

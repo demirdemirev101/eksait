@@ -145,7 +145,45 @@ class CheckoutController extends Controller
             'name' => $name !== null ? (string) $name : null,
             'city' => $city !== null ? (string) $city : null,
             'address' => is_string($address) && trim($address) !== '' ? trim($address) : null,
+            'is_aps' => (bool) ($office['isAPS'] ?? $office['is_aps'] ?? false),
         ];
+    }
+
+    private function enrichSelectedOffice(array $validated, EcontCityResolverService $econtCityResolverService): array
+    {
+        if (($validated['shipping_method'] ?? null) === 'address') {
+            $validated['econt_office_code'] = null;
+            $validated['econt_office_name'] = null;
+            $validated['econt_office_address'] = null;
+            $validated['econt_office_is_aps'] = false;
+
+            return $validated;
+        }
+
+        $officeCode = trim((string) ($validated['econt_office_code'] ?? ''));
+
+        if ($officeCode === '') {
+            return $validated;
+        }
+
+        $office = $econtCityResolverService->getOfficeByCode($officeCode);
+
+        if (! is_array($office)) {
+            return $validated;
+        }
+
+        $normalizedOffice = $this->normalizeEcontOffice($office);
+
+        $validated['econt_office_code'] = $normalizedOffice['code'] ?? $validated['econt_office_code'];
+        $validated['econt_office_name'] = $validated['econt_office_name'] ?? $normalizedOffice['name'];
+        $validated['econt_office_address'] = $validated['econt_office_address'] ?? $normalizedOffice['address'];
+        $validated['econt_office_is_aps'] = (bool) ($validated['econt_office_is_aps'] ?? $normalizedOffice['is_aps'] ?? false);
+
+        if (($validated['shipping_method'] ?? null) !== 'apm' && $validated['econt_office_is_aps']) {
+            $validated['shipping_method'] = 'apm';
+        }
+
+        return $validated;
     }
 
     /**
@@ -185,9 +223,13 @@ class CheckoutController extends Controller
      * Calculate shipping cost for the current cart based on shipping address.
      * This is used by frontend to show shipping cost before checkout.
      */
-    public function calculateShipping(CalculateShippingRequest $request, SettingsService $settingsService)
+    public function calculateShipping(
+        CalculateShippingRequest $request,
+        SettingsService $settingsService,
+        EcontCityResolverService $econtCityResolverService
+    )
     {
-        $validated = $request->validated();
+        $validated = $this->enrichSelectedOffice($request->validated(), $econtCityResolverService);
 
         $cartService = $this->getCartService($request);
         $requestedSessionId = $this->frontendCartSessionId($request);
@@ -220,6 +262,9 @@ class CheckoutController extends Controller
             'econt_office_address' => $validated['shipping_method'] === 'address'
                 ? null
                 : ($validated['econt_office_address'] ?? null),
+            'econt_office_is_aps' => $validated['shipping_method'] === 'address'
+                ? false
+                : (bool) ($validated['econt_office_is_aps'] ?? false),
             'payment_method' => $validated['payment_method'] ?? null,
         ]);
         $tempOrder->setRelation('items', $effectiveItems);
@@ -268,9 +313,14 @@ class CheckoutController extends Controller
       * @return \Illuminate\Http\JsonResponse
       * @throws \App\Exceptions\CheckoutException
      */
-    public function store(CheckoutRequest $request, OrderService $orderService, StripeCheckoutService $stripeCheckoutService) 
+    public function store(
+        CheckoutRequest $request,
+        OrderService $orderService,
+        StripeCheckoutService $stripeCheckoutService,
+        EcontCityResolverService $econtCityResolverService
+    ) 
     {
-        $validated = $request->validated();
+        $validated = $this->enrichSelectedOffice($request->validated(), $econtCityResolverService);
         $validated['session_id'] = $this->frontendCartSessionId($request);
 
         try {
@@ -278,6 +328,12 @@ class CheckoutController extends Controller
 
             if ($order->payment_method === 'stripe') {
                 $session = $stripeCheckoutService->createSession($order, $validated['session_id'] ?? null);
+                $order->updateQuietly([
+                    'stripe_checkout_session_id' => $session->id,
+                    'stripe_payment_intent_id' => is_string($session->payment_intent ?? null)
+                        ? $session->payment_intent
+                        : null,
+                ]);
 
                 return response()->json([
                     'success' => true,

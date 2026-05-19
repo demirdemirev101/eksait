@@ -62,6 +62,9 @@ class OrderService
                 'econt_office_address' => $shippingMethod === 'address'
                     ? null
                     : ($data['econt_office_address'] ?? null),
+                'econt_office_is_aps' => $shippingMethod === 'address'
+                    ? false
+                    : (bool) ($data['econt_office_is_aps'] ?? false),
                 'holiday_delivery_day' => $data['holiday_delivery_day'] ?? null,
 
                 'status'            => 'pending',

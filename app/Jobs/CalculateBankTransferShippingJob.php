@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Mail\OrderConfirmationMail;
 use App\Models\Order;
-use App\Models\Setting;
 use App\Services\SettingsService;
 use App\Support\ErrorMessages;
 use App\Jobs\NotifyAdminBankTransferShippingFailedJob;
@@ -49,10 +48,7 @@ class CalculateBankTransferShippingJob implements ShouldQueue
 
         $order->subtotal = $order->items()->sum('total');
 
-        $settings = Setting::current();
-        $freeDelivery = $settings->delivery_enabled
-            && $settings->free_delivery_over !== null
-            && $order->subtotal >= $settings->free_delivery_over;
+        $freeDelivery = $settingsService->qualifiesForFreeDelivery($order);
 
         if ($freeDelivery || ! config('services.econt.enabled')) {
             $order->shipping_price = 0;

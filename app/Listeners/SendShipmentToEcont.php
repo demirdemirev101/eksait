@@ -7,8 +7,7 @@ use App\Jobs\NotifyAdminShipmentFailedJob;
 use App\Jobs\SendTrackingEmailJob;
 use App\Models\Order;
 use App\Models\Shipment;
-use App\Services\Econt\EcontPayloadMapper;
-use App\Services\Econt\EcontService;
+use App\Services\EcontShippingService;
 use App\Support\ErrorMessages;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
@@ -17,35 +16,32 @@ use RuntimeException;
 
 class SendShipmentToEcont implements ShouldQueue
 {
-    // Safeguard to prevent double sending of the same shipment to Econt, implemented in the handle method.
     use InteractsWithQueue;
 
-    // Set the number of attempts for retrying the job in case of failure
     public $tries = 3;
-    // Max timeout for the job execution to prevent hanging tasks
     public $timeout = 60;
-    // Time between retries (in seconds) - can be customized based on the expected time for transient issues to resolve 
-    // For example, if Econt API is down, we might want to wait a bit before retrying to avoid hitting it too frequently
     public $backoff = [30, 60, 120];
+
+    public function __construct(
+        private EcontShippingService $econtShippingService,
+    ) {}
 
     public function handle(ShipmentCreated $event): void
     {
         $shipment = Shipment::with('order')->findOrFail($event->shipmentId);
         $order = $shipment->order;
 
-        if (!$order || $shipment->status !== 'created') {
+        if (! $order || $shipment->status !== 'created') {
             Log::warning('Shipment not ready for Econt', [
                 'order_id' => $event->orderId,
                 'shipment_id' => $shipment->id,
                 'status' => $shipment->status,
             ]);
+
             return;
         }
 
-        /**
-         * 🔒 FEATURE FLAG – DEV GUARD
-         */
-        if (!config('services.econt.enabled')) {
+        if (! config('services.econt.enabled')) {
             $shipment->update([
                 'status' => 'confirmed',
                 'tracking_number' => 'TEST-' . $shipment->id,
@@ -59,72 +55,54 @@ class SendShipmentToEcont implements ShouldQueue
                 'shipment_id' => $shipment->id,
             ]);
 
-            // Dispatch tracking email
             dispatch(new SendTrackingEmailJob($order->id));
 
             return;
         }
-        
-        // Atomic guard - предотвратява двойно изпращане
+
         $updated = Shipment::where('id', $shipment->id)
             ->where('status', 'created')
             ->update(['status' => 'pending']);
 
-        if (!$updated) {
+        if (! $updated) {
             Log::info('Shipment already being processed', [
                 'shipment_id' => $shipment->id,
             ]);
+
             return;
         }
 
         $shipment->refresh();
 
         try {
-            $econtService = app(EcontService::class);
-            $mapper = app(EcontPayloadMapper::class);
-
-            // Подготовка на payload
-            $payload = $mapper->map($shipment);
-
-            // Запис на payload-а преди изпращане
-            $shipment->update([
-                'carrier_payload' => $payload,
-            ]);
-
             Log::info('Sending shipment to Econt', [
                 'shipment_id' => $shipment->id,
-                'payload' => $payload,
             ]);
 
-            // Изпращане към Еконт
-            $response = $econtService->createLabel($payload);
+            $response = $this->econtShippingService->send($shipment);
 
             Log::info('Econt response received', [
                 'shipment_id' => $shipment->id,
                 'response' => $response,
             ]);
 
-            // Обработка на отговора
             $this->processResponse($shipment, $response);
-
         } catch (RuntimeException $e) {
             $this->handleError($shipment, $e);
-            throw $e; // За да се активира retry механизма
+
+            throw $e;
         } catch (\Exception $e) {
             $this->handleError($shipment, $e);
+
             throw $e;
         }
     }
-    /**
-     * Processes the response from Econt after sending the shipment details. It updates the shipment record with the carrier response,
-     *  tracking number, label URL, and changes the status to 'confirmed'. It logs the successful confirmation and dispatches a job
-     *  to send a tracking email to the customer.
-     */
-    private function processResponse($shipment, array $response): void
+
+    private function processResponse(Shipment $shipment, array $response): void
     {
         $label = $response['label'] ?? null;
 
-        if (!$label || empty($label['shipmentNumber'])) {
+        if (! $label || empty($label['shipmentNumber'])) {
             throw new RuntimeException('Invalid response from Econt: missing shipmentNumber');
         }
 
@@ -145,18 +123,10 @@ class SendShipmentToEcont implements ShouldQueue
             'label_url' => $label['pdfURL'] ?? null,
         ]);
 
-        // Изпрати email на клиента с tracking number
         dispatch(new SendTrackingEmailJob($shipment->id));
     }
 
-    /**
-     * Handles errors that occur during the shipment creation process. It updates the shipment status to 'error' and logs the error details,
-     *  including the attempt count. The error message is stored in the shipment record for later reference, and the method allows for retries 
-     *  based on the defined attempts and backoff strategy in the job configuration. This centralized error handling ensures that 
-     *  any issues during the Econt integration are properly logged and the shipment status is updated accordingly,
-     *  allowing for monitoring and manual intervention if needed after multiple failed attempts.
-     */
-    private function handleError($shipment, \Exception $e): void
+    private function handleError(Shipment $shipment, \Exception $e): void
     {
         $errorMessage = $e->getMessage();
 
@@ -174,12 +144,6 @@ class SendShipmentToEcont implements ShouldQueue
         ]);
     }
 
-    /**
-     * Handle job failure after all retry attempts have been exhausted.
-     * It updates the shipment status to 'error' and logs the critical failure, including the error message.
-     * It also dispatches a notification job to alert the administrator about the shipment failure, allowing for timely intervention to resolve the issue.
-     *  This method ensures that even in cases of persistent failures, the system is aware of the problem and can take appropriate action.
-     */
     public function failed($event, \Throwable $exception): void
     {
         $order = Order::with('shipment')->find($event->orderId);
@@ -196,7 +160,6 @@ class SendShipmentToEcont implements ShouldQueue
                 'error' => $exception->getMessage(),
             ]);
 
-            // Изпрати notification до администратор
             dispatch(new NotifyAdminShipmentFailedJob($order->shipment->id));
         }
     }

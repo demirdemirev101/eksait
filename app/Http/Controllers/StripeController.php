@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\OrderPlaced;
 use App\Events\OrderReadyForShipment;
 use App\Models\Order;
+use App\Services\StripeRefundService;
 use App\Services\StockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,6 +79,10 @@ class StripeController extends Controller
                 $order->update([
                     'payment_status' => 'paid',
                     'status' => 'ready_for_shipment',
+                    'stripe_checkout_session_id' => $session->id ?? $order->stripe_checkout_session_id,
+                    'stripe_payment_intent_id' => is_string($session->payment_intent ?? null)
+                        ? $session->payment_intent
+                        : $order->stripe_payment_intent_id,
                 ]);
 
                 return true;
@@ -118,6 +123,62 @@ class StripeController extends Controller
                     }
                 }
             });
+        }
+
+        if ($event->type === 'charge.succeeded') {
+            $charge = $event->data->object;
+            $paymentIntentId = $charge->payment_intent ?? null;
+            $orderId = $charge->metadata->order_id ?? null;
+
+            if ($paymentIntentId || $orderId) {
+                Order::query()
+                    ->when($paymentIntentId, fn ($query) => $query->where('stripe_payment_intent_id', $paymentIntentId))
+                    ->when(! $paymentIntentId && $orderId, fn ($query) => $query->whereKey($orderId))
+                    ->update([
+                        'stripe_payment_intent_id' => $paymentIntentId,
+                        'stripe_charge_id' => $charge->id ?? null,
+                    ]);
+            }
+        }
+
+        if ($event->type === 'charge.refunded') {
+            $charge = $event->data->object;
+            $paymentIntentId = $charge->payment_intent ?? null;
+            $orderId = $charge->metadata->order_id ?? null;
+            $amountRefunded = ((int) ($charge->amount_refunded ?? 0)) / 100;
+
+            $order = Order::query()
+                ->when($paymentIntentId, fn ($query) => $query->where('stripe_payment_intent_id', $paymentIntentId))
+                ->when(! $paymentIntentId && $orderId, fn ($query) => $query->whereKey($orderId))
+                ->first();
+
+            if ($order && $amountRefunded > (float) $order->refunded_amount) {
+                app(StripeRefundService::class)->applyRefund(
+                    $order,
+                    null,
+                    $amountRefunded - (float) $order->refunded_amount,
+                );
+            }
+        }
+
+        if ($event->type === 'refund.updated') {
+            $refund = $event->data->object;
+            $orderId = $refund->metadata->order_id ?? null;
+
+            if (($refund->status ?? null) === 'succeeded' && (! empty($refund->payment_intent) || $orderId)) {
+                $order = Order::query()
+                    ->when(! empty($refund->payment_intent), fn ($query) => $query->where('stripe_payment_intent_id', $refund->payment_intent))
+                    ->when(empty($refund->payment_intent) && $orderId, fn ($query) => $query->whereKey($orderId))
+                    ->first();
+
+                if ($order && $order->stripe_refund_id !== ($refund->id ?? null)) {
+                    app(StripeRefundService::class)->applyRefund(
+                        $order,
+                        $refund->id ?? null,
+                        ((int) ($refund->amount ?? 0)) / 100,
+                    );
+                }
+            }
         }
 
         return response()->json(['received' => true]);

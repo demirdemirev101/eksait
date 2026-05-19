@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Orders\Schemas;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
-use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -17,29 +16,6 @@ class OrderForm
     {
         return $schema
             ->components([
-                Select::make('user_id')
-                    ->relationship('user', 'name')
-                    ->label('Потребител')
-                    ->nullable()
-                    ->reactive()
-                    ->afterStateUpdated(function ($state, callable $set) {
-                        if (! $state) {
-                            return;
-                        }
-
-                        $user = User::find($state);
-
-                        if (! $user) {
-                            return;
-                        }
-
-                        $set('customer_name', $user->name);
-                        $set('customer_email', $user->email);
-                        $set('customer_phone', $user->phone);
-                    })
-                    ->visible(fn ($record) => (bool) $record->user_id)
-                    ->disabled(),
-
                 TextInput::make('customer_name')
                     ->label('Име на клиента')
                     ->disabled(),
@@ -53,29 +29,40 @@ class OrderForm
                     ->tel()
                     ->disabled(),
 
+                Select::make('shipping_method')
+                    ->label('Метод на доставка')
+                    ->options([
+                        'address' => 'До адрес',
+                        'office' => 'До офис',
+                        'apm' => 'До Еконтомат',
+                    ])
+                    ->native(false)
+                    ->disabled(),
+
                 TextInput::make('shipping_city')
                     ->label('Град за доставка')
                     ->required()
                     ->disabled(),
 
-                TextInput::make('econt_office_code')
-                    ->label('Код на офис Еконт')
-                    ->required(fn($get) => $get('shipping_method') !== 'address')
-                    ->visible(fn($get) => $get('shipping_method') !== 'address')
-                    ->disabled(),
-
                 TextInput::make('shipping_address')
-                    ->label(fn ($get) => $get('shipping_method') === 'address'
-                        ? 'Адрес за доставка'
-                        : 'Офис на Еконт'
-                    )
-                    ->visible()
+                    ->label('Адрес за доставка')
+                    ->visible(fn ($get) => $get('shipping_method') === 'address')
                     ->disabled(),
 
                 TextInput::make('shipping_postcode')
                     ->label('Пощенски код')
-                    ->visible(fn($get) => $get('econt_office_code' !== null))
-                    ->required(fn($get) => $get('econt_office_code' !== null))
+                    ->visible(fn ($get) => $get('shipping_method') === 'address')
+                    ->required(fn ($get) => $get('shipping_method') === 'address')
+                    ->disabled(),
+
+                TextInput::make('econt_office_name')
+                    ->label('Име на офис / Еконтомат')
+                    ->visible(fn ($get) => $get('shipping_method') !== 'address')
+                    ->disabled(),
+
+                TextInput::make('econt_office_address')
+                    ->label('Адрес на офис / Еконтомат')
+                    ->visible(fn ($get) => $get('shipping_method') !== 'address')
                     ->disabled(),
 
                 Select::make('status')

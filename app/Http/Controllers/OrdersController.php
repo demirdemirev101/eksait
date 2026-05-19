@@ -46,6 +46,7 @@ class OrdersController extends Controller
                     'econt_office_code' => $order->econt_office_code,
                     'econt_office_name' => $order->econt_office_name,
                     'econt_office_address' => $order->econt_office_address,
+                    'econt_office_is_aps' => (bool) $order->econt_office_is_aps,
                     'items' => $order->items->map(fn ($item) => [
                         'id' => $item->id,
                         'product_id' => $item->product_id,

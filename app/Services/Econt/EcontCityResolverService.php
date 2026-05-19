@@ -115,6 +115,33 @@ class EcontCityResolverService
         });
     }
 
+    public function getOfficeByCode(string $officeCode): ?array
+    {
+        $normalizedOfficeCode = trim($officeCode);
+
+        if ($normalizedOfficeCode === '') {
+            return null;
+        }
+
+        $allOffices = Cache::remember(self::ALL_OFFICES_CACHE_KEY, now()->addDay(), function () {
+            return $this->econtService->getOffices();
+        });
+
+        foreach ($allOffices as $office) {
+            if (! is_array($office)) {
+                continue;
+            }
+
+            $code = (string) ($office['code'] ?? $office['officeCode'] ?? $office['office_code'] ?? '');
+
+            if ($code === $normalizedOfficeCode) {
+                return $office;
+            }
+        }
+
+        return null;
+    }
+
     private function officeMatchesCity(array $office, string $normalizedCityName): bool
     {
         $candidates = [

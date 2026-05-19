@@ -30,6 +30,40 @@ class OrdersTable
                 TextColumn::make('customer_phone')
                     ->label('Телефонен номер')
                     ->searchable(),
+                TextColumn::make('shipping_method')
+                    ->label('Доставка')
+                    ->state(fn ($record) => match ($record->shipping_method) {
+                        'address' => 'До адрес',
+                        'office' => 'До офис',
+                        'apm' => 'До Еконтомат',
+                        default => $record->shipping_method,
+                    })
+                    ->badge()
+                    ->color(fn ($record) => match ($record->shipping_method) {
+                        'address' => 'gray',
+                        'office' => 'info',
+                        'apm' => 'warning',
+                        default => 'gray',
+                    }),
+                TextColumn::make('shipping_destination')
+                    ->label('Получаване')
+                    ->state(fn ($record) => $record->shipping_method === 'address'
+                        ? trim(implode(', ', array_filter([
+                            $record->shipping_address,
+                            $record->shipping_city,
+                        ])))
+                        : ($record->econt_office_name ?: $record->econt_office_code)
+                    )
+                    ->wrap()
+                    ->searchable(query: function ($query, string $search): void {
+                        $query->where(function ($subQuery) use ($search) {
+                            $subQuery
+                                ->where('shipping_address', 'like', "%{$search}%")
+                                ->orWhere('shipping_city', 'like', "%{$search}%")
+                                ->orWhere('econt_office_name', 'like', "%{$search}%")
+                                ->orWhere('econt_office_code', 'like', "%{$search}%");
+                        });
+                    }),
                 TextColumn::make('status')
                     ->label('Статус на поръчката')
                     ->state(fn ($record) => OrderStatus::tryFrom($record->status)?->label() ?? $record->status)
@@ -58,6 +92,7 @@ class OrdersTable
                         'unpaid' => 'warning',
                         'paid' => 'success',
                         'failed' => 'danger',
+                        'partially_refunded' => 'warning',
                         'refunded' => 'gray',
                         default => 'gray',
                     })
@@ -67,12 +102,14 @@ class OrdersTable
                     ->state(fn ($record) => match ($record->payment_method) {
                         'cod' => 'Наложен платеж',
                         'bank_transfer' => 'Банков превод',
+                        'stripe' => 'Stripe',
                         default => $record->payment_method,
                     })
                     ->badge()
                     ->color(fn ($record) => match ($record->payment_method) {
                         'cod' => 'info',
                         'bank_transfer' => 'primary',
+                        'stripe' => 'success',
                         default => 'gray',
                     }),
                 TextColumn::make('created_at')

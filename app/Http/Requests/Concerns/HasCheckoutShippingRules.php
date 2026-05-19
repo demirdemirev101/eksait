@@ -17,6 +17,7 @@ trait HasCheckoutShippingRules
             'econt_office_code' => 'required_if:shipping_method,office,apm|string|nullable',
             'econt_office_name' => 'nullable|string',
             'econt_office_address' => 'nullable|string',
+            'econt_office_is_aps' => 'nullable|boolean',
             'payment_method' => 'nullable|string',
             'session_id' => 'sometimes|string',
         ];
