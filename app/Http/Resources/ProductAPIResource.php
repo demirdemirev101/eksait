@@ -63,6 +63,11 @@ class ProductAPIResource extends JsonResource
                         'price' => number_format((float) $related->price, 2, '.', ''),
                         'sale_price' => $related->sale_price ? number_format((float) $related->sale_price, 2, '.', '') : null,
                         'stock' => (bool) $related->stock && (int) $related->quantity > 0,
+                        'categories' => $related->categories->map(fn ($category) => [
+                            'id' => $category->id,
+                            'name' => $category->name,
+                            'slug' => $category->slug,
+                        ])->values(),
                         'image_path' => $imagePath,
                         'image_url' => $imagePath ? asset('storage/' . $imagePath) : null,
                     ];

@@ -23,6 +23,7 @@ class ProductApiController extends Controller
             'images:id,product_id,image_path,is_primary,sort_order',
             'variants:id,product_id,size,price,sale_price,stock,quantity,weight,width,height,length',
             'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
+            'relatedProducts.categories:id,name,slug',
             'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
             'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
         ])->get();
@@ -48,6 +49,7 @@ class ProductApiController extends Controller
                 'images:id,product_id,image_path,is_primary,sort_order',
                 'variants:id,product_id,size,price,sale_price,stock,quantity,weight,width,height,length',
                 'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
+                'relatedProducts.categories:id,name,slug',
                 'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
                 'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
             ])

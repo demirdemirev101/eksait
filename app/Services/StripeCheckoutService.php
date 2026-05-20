@@ -76,26 +76,12 @@ class StripeCheckoutService
 
     private function frontendUrl(): string
     {
-        $urls = array_filter(array_map(
-            'trim',
-            explode(',', (string) env('FRONTEND_URLS', ''))
-        ));
-
-        foreach ($urls as $url) {
-            $host = parse_url($url, PHP_URL_HOST);
-
-            if ($host && ! in_array($host, ['localhost', '127.0.0.1'], true)) {
-                return rtrim($url, '/');
-            }
-        }
-
         $configuredUrl = (string) config('app.frontend_url', '');
-        $configuredHost = parse_url($configuredUrl, PHP_URL_HOST);
 
-        if ($configuredHost && ! in_array($configuredHost, ['localhost', '127.0.0.1'], true)) {
+        if (parse_url($configuredUrl, PHP_URL_HOST)) {
             return rtrim($configuredUrl, '/');
         }
 
-        return 'http://192.168.1.102:5173';
+        return 'http://localhost:5173';
     }
 }

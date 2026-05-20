@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => explode(',', env('FRONTEND_URLS')),
+    'allowed_origins' => array_filter([env('FRONTEND_URL', env('APP_URL', 'http://localhost'))]),
 
     'allowed_origins_patterns' => [],
 
