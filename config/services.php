@@ -57,7 +57,7 @@ return [
         
         // Данни на изпращача
         'sender' => [
-            'name' => env('ECONT_SENDER_NAME', 'Freshwater'),
+            'name' => env('ECONT_SENDER_NAME', 'Excite Company'),
             'phone' => env('ECONT_SENDER_PHONE', '+359888888888'),
 
             // Office (production)
@@ -66,13 +66,13 @@ return [
             // Address (sandbox / validate)
             'city' => env('ECONT_SENDER_CITY', 'Стара Загора'),
             'postcode' => env('ECONT_SENDER_POSTCODE', '6000'),
-            'street' => env('ECONT_SENDER_STREET', 'бул. Руски 1'),
-            'num' => env('ECONT_SENDER_NUM', '1'),
+            'street' => env('ECONT_SENDER_STREET', 'ул. Войвода Стойчо Черногоров'),
+            'num' => env('ECONT_SENDER_NUM', '47'),
         ],
     ],
 
     'bank_transfer' => [
-        'company_name' => env('BANK_TRANSFER_COMPANY', 'Freshwater EOOD'),
+        'company_name' => env('BANK_TRANSFER_COMPANY', 'Excite Company EOOD'),
         'iban' => env('BANK_TRANSFER_IBAN', 'BG00XXXX00000000000000'),
         'bank_name' => env('BANK_TRANSFER_BANK', 'Demo Bank'),
         'bic' => env('BANK_TRANSFER_BIC', 'DEMOXXX'),

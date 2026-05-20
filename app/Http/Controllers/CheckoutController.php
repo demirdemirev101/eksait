@@ -284,9 +284,16 @@ class CheckoutController extends Controller
             ], 422);
         }
 
-        // Use a live estimate here so the checkout UI can show Econt pricing
-        // even for payment methods that are deferred in the final order flow.
-        $tempOrder->shipping_price = $settingsService->estimateShipping($tempOrder);
+        try {
+            // Use a live estimate here so the checkout UI can show Econt pricing
+            // even for payment methods that are deferred in the final order flow.
+            $tempOrder->shipping_price = $settingsService->estimateShipping($tempOrder);
+        } catch (CheckoutException $e) {
+            return response()->json([
+                'shipping_price' => null,
+                'message' => $e->getMessage(),
+            ], $e->status());
+        }
 
         Log::info('calculate shipping price', [
             'requested_session_id' => $requestedSessionId,

@@ -18,6 +18,7 @@ class CalculateShippingRequest extends FormRequest
     {
         return [
             ...$this->checkoutShippingRules(),
+            'payment_method' => 'required|in:bank_transfer,cod,stripe',
             'items' => 'sometimes|array|min:1',
             'items.*.product_id' => 'required_with:items|integer|exists:products,id',
             'items.*.product_variant_id' => 'nullable|integer|exists:product_variants,id',

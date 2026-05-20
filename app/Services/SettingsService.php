@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CheckoutException;
 use App\Models\Order;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,13 @@ class SettingsService
             return;
         }
 
-        $order->shipping_price = $this->calculateEcontShipping($order);
+        if (! config('services.econt.enabled')) {
+            $order->shipping_price = 0;
+
+            return;
+        }
+
+        $order->shipping_price = $this->calculateEcontShippingOrFail($order);
     }
 
     public function estimateShipping(Order $order): float
@@ -49,7 +56,7 @@ class SettingsService
             return 0.0;
         }
 
-        return $this->calculateEcontShipping($order);
+        return $this->calculateEcontShippingOrFail($order);
     }
 
     public function applyTotals(Order $order): void
@@ -94,5 +101,32 @@ class SettingsService
 
             return 0.0;
         }
+    }
+
+    private function calculateEcontShippingOrFail(Order $order): float
+    {
+        try {
+            $shippingPrice = $this->econtShippingService->estimate($order);
+        } catch (\Throwable $e) {
+            Log::warning('Econt shipping calculate failed', [
+                'order_id' => $order->id,
+                'payment_method' => $order->payment_method,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new CheckoutException('Unable to calculate shipping price. Please try again.', 422);
+        }
+
+        if ($shippingPrice <= 0) {
+            Log::warning('Econt shipping returned non-positive price', [
+                'order_id' => $order->id,
+                'payment_method' => $order->payment_method,
+                'shipping_price' => $shippingPrice,
+            ]);
+
+            throw new CheckoutException('Unable to calculate shipping price. Please try again.', 422);
+        }
+
+        return $shippingPrice;
     }
 }
