@@ -39,12 +39,13 @@ class ImagesRelationManager extends RelationManager
             ->components([
                 Toggle::make('is_primary')
                     ->label('Основно изображение')
+                    ->default(fn (): bool => ! $this->getOwnerRecord()->images()->where('is_primary', true)->exists())
                     ->required(),
                 TextInput::make('sort_order')
                     ->label('Ред на изображението')
                     ->required()
                     ->numeric()
-                    ->default(0),
+                    ->default(fn (): int => ((int) $this->getOwnerRecord()->images()->max('sort_order')) + 1),
                 FileUpload::make('image_path')
                     ->label('Изображение')
                     ->image()
