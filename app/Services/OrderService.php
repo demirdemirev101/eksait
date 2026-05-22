@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Exceptions\CheckoutException;
 use App\Events\OrderPlaced;
 use App\Jobs\CalculateBankTransferShippingJob;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -39,6 +41,10 @@ class OrderService
     {
         return DB::transaction(function () use ($data) {
             $shippingMethod = $data['shipping_method'] ?? 'address';
+
+            if (($data['payment_method'] ?? null) === 'stripe' && ! Setting::current()->stripe_enabled) {
+                throw new CheckoutException('Stripe payments are currently disabled.', 422);
+            }
 
             $user = Auth::user();
 

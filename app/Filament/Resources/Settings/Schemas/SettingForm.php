@@ -31,6 +31,14 @@ class SettingForm
                         ]),
                     ])
                     ->columnSpanFull(),
+                Section::make('Плащания')
+                    ->schema([
+                        Toggle::make('stripe_enabled')
+                            ->label('Stripe плащане')
+                            ->helperText('Когато е изключено, Stripe остава в системата, но клиентите не могат да го използват при checkout.')
+                            ->default(false),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 }

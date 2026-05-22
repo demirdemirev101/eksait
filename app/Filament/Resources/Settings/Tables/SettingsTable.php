@@ -20,6 +20,13 @@ class SettingsTable
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
                     ->falseColor('danger'),
+                IconColumn::make('stripe_enabled')
+                    ->label('Stripe')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
                 TextColumn::make('free_delivery_over')
                     ->label('Безплатна доставка над')
                     ->money('EUR', 0.00),

@@ -18,6 +18,14 @@ class Setting extends Model
         'delivery_price',
         'free_delivery_over',
         'delivery_enabled',
+        'stripe_enabled',
+    ];
+
+    protected $casts = [
+        'delivery_enabled' => 'boolean',
+        'stripe_enabled' => 'boolean',
+        'delivery_price' => 'decimal:2',
+        'free_delivery_over' => 'decimal:2',
     ];
     /** 
      * Retrieve the current application settings. If no settings exist, create a new default instance.

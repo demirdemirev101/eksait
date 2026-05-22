@@ -21,7 +21,7 @@ class ProductApiController extends Controller
         $products = Product::with([
             'categories:id,name,slug',
             'images:id,product_id,image_path,is_primary,sort_order',
-            'variants:id,product_id,size,price,sale_price,stock,quantity,weight,width,height,length',
+            'variants:id,product_id,size,price,sale_price,stock,quantity',
             'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
             'relatedProducts.categories:id,name,slug',
             'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
@@ -47,7 +47,7 @@ class ProductApiController extends Controller
             ->with([
                 'categories:id,name,slug',
                 'images:id,product_id,image_path,is_primary,sort_order',
-                'variants:id,product_id,size,price,sale_price,stock,quantity,weight,width,height,length',
+                'variants:id,product_id,size,price,sale_price,stock,quantity',
                 'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
                 'relatedProducts.categories:id,name,slug',
                 'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',

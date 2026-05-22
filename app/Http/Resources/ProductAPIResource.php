@@ -45,10 +45,6 @@ class ProductAPIResource extends JsonResource
                     'sale_price' => $variant->sale_price ? number_format((float) $variant->sale_price, 2, '.', '') : null,
                     'stock' => (bool) $variant->stock && (int) $variant->quantity > 0,
                     'quantity' => max(0, (int) $variant->quantity),
-                    'weight' => $variant->weight !== null ? number_format((float) $variant->weight, 2, '.', '') : null,
-                    'width' => $variant->width !== null ? number_format((float) $variant->width, 2, '.', '') : null,
-                    'height' => $variant->height !== null ? number_format((float) $variant->height, 2, '.', '') : null,
-                    'length' => $variant->length !== null ? number_format((float) $variant->length, 2, '.', '') : null,
                 ])->values()
                 : [],
             'related_products' => $relatedProducts instanceof \Illuminate\Support\Collection

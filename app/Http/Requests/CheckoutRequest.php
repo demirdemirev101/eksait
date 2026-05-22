@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\HasCheckoutShippingRules;
+use App\Models\Setting;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CheckoutRequest extends FormRequest
 {
@@ -29,10 +31,16 @@ class CheckoutRequest extends FormRequest
                 'customer_phone' => 'nullable|string',
             ];
 
+        $paymentMethods = ['bank_transfer', 'cod'];
+
+        if (Setting::current()->stripe_enabled) {
+            $paymentMethods[] = 'stripe';
+        }
+
         return [
             ...$this->checkoutShippingRules(),
             ...$customerRules,
-            'payment_method' => 'required|in:bank_transfer,cod,stripe',
+            'payment_method' => ['required', Rule::in($paymentMethods)],
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',

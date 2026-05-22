@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Setting;
 use App\Services\CartService;
 use App\Services\Econt\EcontCityResolverService;
 use App\Services\OrderService;
@@ -24,6 +25,33 @@ use Illuminate\Support\Facades\Session;
 
 class CheckoutController extends Controller
 {
+    public function paymentMethods()
+    {
+        $settings = Setting::current();
+        $methods = [
+            [
+                'value' => 'bank_transfer',
+                'label' => 'Банков превод',
+            ],
+            [
+                'value' => 'cod',
+                'label' => 'Наложен платеж',
+            ],
+        ];
+
+        if ($settings->stripe_enabled) {
+            $methods[] = [
+                'value' => 'stripe',
+                'label' => 'Stripe',
+            ];
+        }
+
+        return response()->json([
+            'stripe_enabled' => (bool) $settings->stripe_enabled,
+            'payment_methods' => $methods,
+        ]);
+    }
+
     /**
      * Resolve CartService using the session_id sent by the React client.
      * This keeps checkout pricing aligned with the cart endpoints instead of falling back to Laravel's cookie session ID.

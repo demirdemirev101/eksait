@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Sales;
 
 use App\Filament\Resources\Sales\Pages\CreateSale;
 use App\Filament\Resources\Sales\Pages\ListSales;
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -16,6 +17,7 @@ use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\VerticalAlignment;
@@ -51,21 +53,68 @@ class SaleResource extends Resource
                 Section::make('Добавяне на продукт')
                     ->description('Изберете продукт, въведете количество и го добавете към текущата продажба.')
                     ->schema([
-                        Select::make('product_id')
-                            ->label('Продукт')
-                            ->options(fn (): array => Product::query()
+                        Select::make('category_id')
+                            ->label('Категория')
+                            ->options(fn (): array => Category::query()
                                 ->orderBy('name')
                                 ->pluck('name', 'id')
                                 ->all())
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->afterStateUpdated(function ($set): void {
+                                $set('product_id', null);
+                                $set('product_variant_id', null);
+                            })
+                            ->dehydrated(false)
+                            ->columnSpan(['default' => 12, 'lg' => 3]),
+
+                        Select::make('product_id')
+                            ->label('Продукт')
+                            ->options(fn (Get $get): array => Product::query()
+                                ->when(
+                                    filled($get('category_id')),
+                                    fn (Builder $query): Builder => $query->whereHas(
+                                        'categories',
+                                        fn (Builder $categoryQuery): Builder => $categoryQuery->whereKey($get('category_id')),
+                                    ),
+                                    fn (Builder $query): Builder => $query->whereRaw('1 = 0'),
+                                )
+                                ->withCount('variants')
+                                ->orderByDesc('variants_count')
+                                ->orderBy('name')
+                                ->limit(100)
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->getSearchResultsUsing(fn (string $search, Get $get): array => Product::query()
+                                ->when(
+                                    filled($get('category_id')),
+                                    fn (Builder $query): Builder => $query->whereHas(
+                                        'categories',
+                                        fn (Builder $categoryQuery): Builder => $categoryQuery->whereKey($get('category_id')),
+                                    ),
+                                    fn (Builder $query): Builder => $query->whereRaw('1 = 0'),
+                                )
+                                ->where('name', 'like', "%{$search}%")
+                                ->withCount('variants')
+                                ->orderByDesc('variants_count')
+                                ->orderBy('name')
+                                ->limit(50)
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->getOptionLabelUsing(fn ($value): ?string => Product::query()
+                                ->whereKey($value)
+                                ->value('name'))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->disabled(fn ($get): bool => blank($get('category_id')))
                             ->afterStateUpdated(fn ($set) => $set('product_variant_id', null))
                             ->dehydrated(false)
-                            ->columnSpan(['default' => 12, 'lg' => 5]),
+                            ->columnSpan(['default' => 12, 'lg' => 4]),
 
                         Select::make('product_variant_id')
-                            ->label('Variant')
+                            ->label('Вариант')
                             ->options(fn ($get): array => ProductVariant::query()
                                 ->where('product_id', $get('product_id'))
                                 ->orderBy('size')
@@ -90,7 +139,7 @@ class SaleResource extends Resource
                             ->minValue(1)
                             ->default(1)
                             ->dehydrated(false)
-                            ->columnSpan(['default' => 12, 'sm' => 6, 'lg' => 2]),
+                            ->columnSpan(['default' => 12, 'sm' => 6, 'lg' => 1]),
 
                         Actions::make([
                             Action::make('add_to_cart')
@@ -110,7 +159,7 @@ class SaleResource extends Resource
                                 }),
                         ])
                             ->verticalAlignment(VerticalAlignment::End)
-                            ->columnSpan(['default' => 12, 'sm' => 6, 'lg' => 3]),
+                            ->columnSpan(['default' => 12, 'sm' => 6, 'lg' => 2]),
                     ])
                     ->columns(12)
                     ->columnSpanFull(),
