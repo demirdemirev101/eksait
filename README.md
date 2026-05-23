@@ -1,59 +1,301 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Eksait
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Eksait is a Laravel e-commerce backend with a JSON API, Filament admin panel, cart and checkout flows, product variants, Econt delivery integration, Stripe card payments, and Bulgarian localization.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Product catalog with categories, images, related products, variants, stock state, dimensions, and weights.
+- Guest and authenticated carts with session-based cart recovery and merge-on-login behavior.
+- Checkout flow with bank transfer, cash on delivery, and optional Stripe payment sessions.
+- Econt shipping support for address, office, and automatic post station delivery.
+- Order, shipment, settings, product, category, banner, message, user, and sales management through Filament.
+- Shipment creation, tracking emails, order confirmation emails, and admin notifications through queued jobs and listeners.
+- Public API endpoints for products, cart, checkout, authentication, contact messages, orders, and home banners.
+- PHPUnit coverage for cart behavior, checkout cleanup, stock consistency, settings, and weight calculations.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.3
+- Laravel 13
+- Laravel Sanctum
+- Filament 4
+- Spatie Laravel Permission
+- Stripe PHP SDK
+- Maatwebsite Excel
+- Vite 7
+- Tailwind CSS 4
+- PHPUnit 12
 
-## Learning Laravel
+## Requirements
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- PHP 8.3 or newer
+- Composer
+- Node.js and npm
+- MySQL or another Laravel-supported database
+- Stripe account credentials, if Stripe payments are enabled
+- Econt credentials, if live Econt shipping is enabled
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Installation
 
-## Laravel Sponsors
+Clone the repository and install dependencies:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+git clone https://github.com/demirdemirev101/eksait.git
+cd eksait
+composer install
+npm install
+```
 
-### Premium Partners
+Create the environment file and application key:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+Configure your database in `.env`, then run migrations:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan migrate
+```
 
-## Code of Conduct
+Build frontend assets:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+npm run build
+```
 
-## Security Vulnerabilities
+The project also includes a Composer setup script that installs dependencies, creates `.env`, generates the key, runs migrations, installs npm packages, and builds assets:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+composer run setup
+```
+
+## Environment Configuration
+
+Important `.env` values:
+
+```env
+APP_NAME=Eksait
+APP_URL=http://localhost
+FRONTEND_URL=http://localhost:5173
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=freshwater
+DB_USERNAME=root
+DB_PASSWORD=
+
+QUEUE_CONNECTION=database
+SESSION_DRIVER=database
+
+STRIPE_SK=
+STRIPE_PK=
+STRIPE_WEBHOOK_SECRET=
+
+ECONT_ENABLED=false
+ECONT_SANDBOX=true
+ECONT_VERIFY_SSL=true
+ECONT_BASE_URL=https://demo.econt.com/ee/services
+ECONT_TRACK_URL=
+ECONT_MAX_PACK_WEIGHT_KG=30
+ECONT_CARGO_DIMENSION_FROM_CM=60
+ECONT_USERNAME=
+ECONT_PASSWORD=
+ECONT_SENDER_NAME=
+ECONT_SENDER_PHONE=
+ECONT_SENDER_OFFICE=
+ECONT_SENDER_CITY=
+ECONT_SENDER_POSTCODE=
+ECONT_SENDER_STREET=
+ECONT_SENDER_NUM=
+
+BANK_TRANSFER_COMPANY=
+BANK_TRANSFER_IBAN=
+BANK_TRANSFER_BANK=
+BANK_TRANSFER_BIC=
+BANK_TRANSFER_CURRENCY=EUR
+```
+
+Set `FRONTEND_URL` to the URL of the React or storefront client that consumes this API. Stripe checkout success and cancel URLs are built from this value.
+
+Use the demo Econt base URL for sandbox testing:
+
+```env
+ECONT_BASE_URL=https://demo.econt.com/ee/services
+```
+
+Use the production Econt base URL only with production credentials:
+
+```env
+ECONT_BASE_URL=https://ee.econt.com/services
+```
+
+`php artisan test:econt-api` reads `ECONT_BASE_URL`, `ECONT_VERIFY_SSL`, `ECONT_USERNAME`, and `ECONT_PASSWORD` through `config/services.php`. It does not print the configured username or password.
+
+## Running Locally
+
+Start the Laravel server, queue worker, and Vite dev server together:
+
+```bash
+composer run dev
+```
+
+Or run them separately:
+
+```bash
+php artisan serve
+php artisan queue:listen --tries=1
+npm run dev
+```
+
+The default API server runs at `http://127.0.0.1:8000`. The Filament admin panel is registered at `/admin`.
+
+## Testing
+
+Run the test suite:
+
+```bash
+composer test
+```
+
+Run Laravel Pint formatting:
+
+```bash
+./vendor/bin/pint
+```
+
+## API Overview
+
+Public endpoints:
+
+```text
+GET    /api/products
+GET    /api/products/search
+GET    /api/home-banner
+GET    /api/checkout/payment-methods
+POST   /api/contact
+POST   /api/login
+POST   /api/register
+POST   /api/forgot-password
+POST   /api/reset-password
+POST   /api/stripe/webhook
+```
+
+Cart and checkout endpoints support authenticated users through Sanctum and guests through a cart session id:
+
+```text
+GET    /api/cart
+POST   /api/cart/add/{product}
+PATCH  /api/cart/update/{product}
+DELETE /api/cart/delete/{product}
+DELETE /api/cart
+GET    /api/checkout/econt-offices
+POST   /api/checkout/calculate-shipping
+POST   /api/checkout
+```
+
+Authenticated endpoints:
+
+```text
+GET    /api/me
+GET    /api/user
+POST   /api/logout
+GET    /api/orders
+```
+
+For guest cart continuity, send the same session id in one of these places:
+
+- `session_id` request body field
+- `sessionId` request body field
+- `session_id` query parameter
+- `sessionId` query parameter
+- `X-Cart-Session-Id` header
+
+## Checkout Flow
+
+1. Add products or variants to the cart.
+2. Fetch available payment methods with `GET /api/checkout/payment-methods`.
+3. For Econt delivery, fetch offices with `GET /api/checkout/econt-offices?city=...`.
+4. Estimate shipping with `POST /api/checkout/calculate-shipping`.
+5. Submit the order with `POST /api/checkout`.
+6. If the selected payment method is `stripe`, redirect the customer to the returned `checkout_url`.
+7. Stripe webhook updates the order payment state after payment events.
+
+## Admin Panel
+
+Filament resources are available for:
+
+- Products, variants, images, and related products
+- Categories
+- Orders, items, and shipments
+- Sales
+- Settings
+- Home banners
+- Contact messages
+- Users
+
+Admin access is protected by application middleware and permissions. Create or promote an admin user according to your deployment process before exposing the panel.
+
+## Background Jobs and Events
+
+The application uses queued listeners and jobs for order and shipment side effects:
+
+- Order confirmation emails
+- Admin order notifications
+- Bank transfer shipping calculation failures
+- Econt shipment creation
+- Shipment tracking emails
+- Shipment failure notifications
+- Guest cart clearing after order placement
+
+Use a queue worker in local development and production:
+
+```bash
+php artisan queue:work
+```
+
+## Useful Commands
+
+```bash
+php artisan migrate
+php artisan migrate:fresh --seed
+php artisan test
+php artisan queue:work
+npm run dev
+npm run build
+```
+
+There are also Econt-focused console commands for integration checks:
+
+```bash
+php artisan test:econt-api
+php artisan test:econt-minimal
+```
+
+## Project Structure
+
+```text
+app/Filament/Resources   Admin resources and Filament screens
+app/Http/Controllers     API and web controllers
+app/Http/Requests        Request validation
+app/Models               Eloquent models
+app/Services             Cart, checkout, payment, settings, stock, shipping services
+app/Services/Econt       Econt API adapter and payload mapping
+app/Jobs                 Queue jobs
+app/Listeners            Event listeners
+database/migrations      Database schema
+resources/views/emails   Mail templates
+routes/api.php           JSON API routes
+tests/Feature            Feature tests
+```
+
+## Security Notes
+
+- Do not commit real Stripe, Econt, bank, mail, or production database credentials.
+- Keep `.env.example` as a safe template only. Store real values in `.env` or your deployment secret manager.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open-sourced software licensed under the MIT license.

@@ -8,79 +8,79 @@ use Illuminate\Support\Facades\Http;
 class TestEcontApi extends Command
 {
     protected $signature = 'test:econt-api';
-    protected $description = 'Test Econt Demo API';
+    protected $description = 'Test the configured Econt API connection';
 
-   public function handle()
-{
-    $this->info('Testing Econt Demo API...');
-    $this->info('URL: https://demo.econt.com/ee/services');
-    $this->info('Username: iasp-dev');
-    $this->info('Password: 1Asp-dev');
-    $this->newLine();
-    
-    // Test 1: Nomenclatures
-    $this->info('Test 1: getCities...');
-    $response = Http::withOptions([
-            'verify' => false,
-            'debug' => false,
-        ])
-        ->timeout(30)
-        ->withBasicAuth('iasp-dev', '1Asp-dev')
-        ->withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ])
-        ->post('https://demo.econt.com/ee/services/Nomenclatures/NomenclaturesService.getCities.json', [
-            'countryCode' => 'BGR',
-            'name' => 'София',
-        ]);
+    public function handle(): int
+    {
+        $baseUrl = rtrim((string) config('services.econt.base_url'), '/');
+        $username = (string) config('services.econt.username');
+        $password = (string) config('services.econt.password');
+        $verifySsl = (bool) config('services.econt.verify_ssl', true);
 
-    $this->info("Status Code: " . $response->status());
-    
-    if ($response->successful()) {
-        $data = $response->json();
-        $this->info("✅ SUCCESS!");
-        $this->info(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    } else {
-        $this->error("❌ FAILED");
-        $this->error("Response: " . $response->body());
-        
-        // Try production URL
-        $this->newLine();
-        $this->warn('Trying production URL...');
-        
-        $response2 = Http::withOptions(['verify' => false])
-            ->timeout(30)
-            ->withBasicAuth('iasp-dev', 'iasp-dev')
-            ->post('https://ee.econt.com/services/Nomenclatures/NomenclaturesService.getCities.json', [
-                'countryCode' => 'BGR',
-                'name' => 'София',
-            ]);
-            
-        $this->info("Production Status: " . $response2->status());
-        $this->info("Production Response: " . $response2->body());
-    }
+        if ($baseUrl === '' || $username === '' || $password === '') {
+            $this->error('Missing Econt configuration. Check ECONT_BASE_URL, ECONT_USERNAME, and ECONT_PASSWORD.');
 
-    $this->newLine();
-    $this->info('Test 2: getOffices for Sofia...');
-    
-    $response2 = Http::withOptions(['verify' => false])
-        ->withBasicAuth('iasp-dev', '1Asp-dev')
-        ->post('https://demo.econt.com/ee/services/Nomenclatures/NomenclaturesService.getOffices.json', [
-            'countryCode' => 'BGR',
-            'cityId' => 68134, // ID на София
-        ]);
-    
-    $this->info("Status: " . $response2->status());
-    
-    if ($response2->successful()) {
-        $offices = $response2->json('offices', []);
-        $this->info("Found " . count($offices) . " offices");
-        
-        foreach (array_slice($offices, 0, 3) as $office) {
-            $this->line("  • " . ($office['name'] ?? 'N/A') . 
-                       " (" . ($office['code'] ?? 'N/A') . ")");
+            return self::FAILURE;
         }
+
+        $this->info('Testing configured Econt API connection...');
+        $this->info("URL: {$baseUrl}");
+        $this->info('Credentials: configured');
+        $this->newLine();
+
+        $client = Http::withOptions([
+                'verify' => $verifySsl,
+                'debug' => false,
+            ])
+            ->timeout(30)
+            ->withBasicAuth($username, $password)
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ]);
+
+        $this->info('Test 1: getCities...');
+        $response = $client->post($baseUrl . '/Nomenclatures/NomenclaturesService.getCities.json', [
+            'countryCode' => 'BGR',
+            'name' => 'Sofia',
+        ]);
+
+        $this->info('Status Code: ' . $response->status());
+
+        if (! $response->successful()) {
+            $this->error('FAILED');
+            $this->error('Response: ' . $response->body());
+
+            return self::FAILURE;
+        }
+
+        $this->info('SUCCESS');
+        $this->info(json_encode($response->json(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        $this->newLine();
+        $this->info('Test 2: getOffices for Sofia...');
+
+        $response = $client->post($baseUrl . '/Nomenclatures/NomenclaturesService.getOffices.json', [
+            'countryCode' => 'BGR',
+            'cityId' => 68134,
+        ]);
+
+        $this->info('Status: ' . $response->status());
+
+        if (! $response->successful()) {
+            $this->error('FAILED');
+            $this->error('Response: ' . $response->body());
+
+            return self::FAILURE;
+        }
+
+        $offices = $response->json('offices', []);
+        $this->info('Found ' . count($offices) . ' offices');
+
+        foreach (array_slice($offices, 0, 3) as $office) {
+            $this->line('  - ' . ($office['name'] ?? 'N/A') . ' (' . ($office['code'] ?? 'N/A') . ')');
+        }
+
+        return self::SUCCESS;
     }
-}
 }
