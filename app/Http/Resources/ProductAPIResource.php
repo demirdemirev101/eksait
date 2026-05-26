@@ -32,7 +32,7 @@ class ProductAPIResource extends JsonResource
                 ? $availableVariants->isNotEmpty()
                 : ((bool) $this->stock && (int) $this->quantity > 0),
             'quantity' => $hasVariants
-                ? (int) $availableVariants->sum('quantity')
+                ? 0
                 : max(0, (int) $this->quantity),
             'description' => $this->description,
             'extra_information' => $this->extra_information,

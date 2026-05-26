@@ -8,7 +8,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -52,25 +51,13 @@ class VariantsRelationManager extends RelationManager
 
                 Section::make('Наличност')
                     ->schema([
-                        Grid::make(2)->schema([
-                            Toggle::make('stock')
-                                ->label('Следи наличност')
-                                ->default(true)
-                                ->reactive()
-                                ->afterStateUpdated(function ($state, callable $set): void {
-                                    if ($state === false) {
-                                        $set('quantity', null);
-                                    }
-                                })
-                                ->required(),
+                        Grid::make(1)->schema([
                             TextInput::make('quantity')
                                 ->label('Количество')
                                 ->numeric()
                                 ->integer()
                                 ->minValue(0)
                                 ->default(0)
-                                ->reactive()
-                                ->visible(fn ($get) => $get('stock') === true)
                                 ->required(),
                         ]),
                     ])
@@ -153,4 +140,3 @@ class VariantsRelationManager extends RelationManager
             ]);
     }
 }
-

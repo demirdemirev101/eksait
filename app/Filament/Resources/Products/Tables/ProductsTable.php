@@ -33,6 +33,7 @@ class ProductsTable
                     ->money('EUR', 0.00)
                     ->sortable(),
                 TextColumn::make('quantity')
+                    ->formatStateUsing(fn ($state, $record): string => ($record->variants_count ?? 0) > 0 ? '-' : (string) $state)
                     ->label('Наличност')
                     ->searchable()
                     ->sortable(),

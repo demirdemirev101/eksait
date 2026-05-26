@@ -295,6 +295,20 @@ class ImportInventory extends Command
 
     private function splitProductAndVariant(string $name): array
     {
+        if (preg_match('/^(?<product>ДОРНИК\s+ЦАНГОВ)\s+(?<variant>.+)$/iu', $name, $matches)) {
+            return [
+                $this->cleanProductName($matches['product']),
+                $this->cleanProductName($matches['variant']),
+            ];
+        }
+
+        if (preg_match('/^(?<product>ДОРНИК)\s+(?<variant>ЗА\s+ФРЕЗА)\s+(?<iso>ИСО\s*\d+)$/iu', $name, $matches)) {
+            return [
+                $this->cleanProductName($matches['product'] . ' ' . $matches['iso']),
+                $this->cleanProductName($matches['variant']),
+            ];
+        }
+
         if (preg_match('/^(?<product>.+?)\s*-?\s*ф\s*(?<variant>\d+(?:[.,]\d+)?(?:.*)?)$/iu', $name, $matches)) {
             return [
                 $this->cleanProductName($matches['product']),
@@ -319,6 +333,46 @@ class ImportInventory extends Command
     private function variantTokenPatterns(): array
     {
         return [
+            '/^(?<product>ПИЛА\s+\S+)\s+(?<variant>L\s*\d{1,4}.*)$/iu',
+            '/^(?<product>ДРЪЖКА\s+ЗА\s+ПИЛА)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ДЪРЖАЧ\s+ЗА\s+N\s*\d+(?:[.,]\d+)?)\s*-\s*(?<variant>\d+.*)$/iu',
+            '/^(?<product>АВАНС\.\s+ПЛАЩАНЕ\s+50%\s+НОЖ\s+ЗА\s+\S+)\s+(?<variant>\d+(?:[.,]\d+)?\s*[xх]\s*\d+(?:[.,]\d+)?(?:\s*[xх]\s*\d+(?:[.,]\d+)?)?.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ВЪНШНО\s+ПРЕСТЪРГВАНЕ)\s+(?<variant>\d+(?:[.,]\d+)?\s*[xх]\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ВЪТРЕШНО\s+ПРЕСТЪРГВАНЕ)\s+(?<variant>\d+(?:[.,]\d+)?\s*[xх]\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ЧЕЛНО\s+ПРЕСТ\.\s+45\s+ГРАДУСА)\s+(?<variant>\d+(?:[.,]\d+)?\s*[xх]\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>НОЖ\s+ОТРЕЗЕН)\s+(?<variant>\d+(?:[.,]\d+)?\s*[xх]\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>НОЖ\s+ПРОХОДНО\s+ИЗВИТ\s+45ГР)\s+(?<variant>.+)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ПРОХОДЕН\s+ОТВОР)\s+(?<variant>ISO\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ВЪНШНА\s+РЕЗБА)\s+(?<variant>ISO\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ВЪТРЕШНА\s+РЕЗБА)\s+(?<variant>(?:ISO\s*\d+\s*)?[KКPРMМ]\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ГЛУХ\s+ОТВОР)\s+(?<variant>(?:ISO|ИСО)\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ИЗВИТ\s+30ГР)\s+(?<variant>[KКPРMМ]\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ПРАВ)\s+(?<variant>ISO\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ПРОРЕЗЕН)\s+(?<variant>(?:ISO|ИСО|[PMРМ])\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ЧИСТ)\s+(?<variant>(?:ISO|ИСО)\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+УПОРЕН)\s+(?<variant>(?:(?:ISO|ИСО)\s*\d+\s*)?[KКPРMМ]\s*\d+.*)$/iu',
+            '/^(?<product>НОЖ\s+ЗА\s+ТРАП\\.?\s+КАНАЛ)\s+(?<variant>(?:ISO|ИСО)\s*\d+.*)$/iu',
+            '/^(?<product>ФРЕЗА\s+ТРИСТР)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ФРЕЗА\s+ЧЕЛ\s+ЦИЛ)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ФРЕЗА\s+ДОРН\s+3ТП)\s+(?<variant>[A-ZА-Я]\s*\d+.*)$/iu',
+            '/^(?<product>ФРЕЗА\s+ЧЕРВЯЧНА\s+ОПАШКОВА\s+[AА]\s*\d+)\s+(?<variant>[MМ]\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>ДЪЛБЯК\s+ДИСКОВ)\s+(?<variant>[MМ]\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>ДЪЛБЯК\s+ЧАШКОВИД)\s+(?<variant>[MМ]\s*\d+(?:[.,]\d+)?\s+A\s*\d+.*)$/iu',
+            '/^(?<product>ЛИСТ\s+МЕХАНИЧНА\s+НОЖОВКА)\s+(?<variant>L\s*\d+\s*\/\s*\d+\s*\/\s*\d+(?:[.,]\d+)?.*)$/iu',
+            '/^(?<product>МЕТЧИК\s+РЪЧЕН\s+ТР)\s+(?<variant>.+)$/iu',
+            '/^(?<product>МЕТЧИК\s+РЪЧЕН)\s+(?<variant>PX\s*\d+.*)$/iu',
+            '/^(?<product>ПЛАШКА\s+ТР)\s+(?<variant>\d+.*)$/iu',
+            '/^(?<product>ТЕКСТОЛИТ\s+НА\s+ЛИСТ)\s+(?<variant>\d+(?:[.,]\d+)?\s*(?:mm|мм).*)$/iu',
+            '/^(?<product>ОПАШКА\s+ЗА\s+ПАТР)\s+(?<variant>[A-ZА-Я]\s*\d+.*)$/iu',
+            '/^(?<product>СЪЕДИН\s+КРЪСТАТ\s+ЗА\s+ДОРН)\s+(?<variant>[A-ZА-Я]+\s*\d+.*)$/iu',
+            '/^(?<product>ДОРНИК\s+ИСО\s*\d+)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ДОРНИК\s+ЗА\s+ИНСТР\s+ФРЕЗА)\s+(?<variant>МК\s*\d+.*)$/iu',
+            '/^(?<product>ДОРНИК\s+ЗА\s+ФРЕЗОВА\s+ГЛАВА)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ДОРНИК\s+С\s+ФЛАНЕЦ)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ДОРНИК\s+ЦАНГОВ)\s+(?<variant>.+)$/iu',
+            '/^(?<product>ДОРНИК)\s+(?<variant>ЗА\s+ПАТРОННИК.*)$/iu',
+            '/^(?<product>.+?\/[A-Z0-9]+\/)\s*(?<variant>\d+(?:[.,]\d+)?\s*(?:mm|мм)\b.*)$/iu',
+            '/^(?<product>.+?\/[A-Z0-9]+\/)\s*(?<variant>[A-Z]{1,3}\s*\d{1,4}.*)$/iu',
             '/^(?<product>[A-Z]{3,6})\s+(?<variant>[A-Z0-9][A-Z0-9.]*.*)$/u',
             '/^(?<product>.+?)\s+(?<variant>МК\s*\d+.*)$/u',
             '/^(?<product>.+?)\s+(?<variant>\d+(?:[.,]\d+)?\s+[A-ZА-Я]\b.*)$/u',
@@ -336,15 +390,13 @@ class ImportInventory extends Command
     private function syncProductFromVariants(Product $product): void
     {
         $stats = $product->variants()
-            ->selectRaw('MIN(price) as min_price, SUM(quantity) as total_quantity')
+            ->selectRaw('MIN(price) as min_price')
             ->first();
-
-        $quantity = (int) ($stats->total_quantity ?? 0);
 
         $product->forceFill([
             'price' => $stats->min_price,
-            'quantity' => $quantity,
-            'stock' => $quantity > 0,
+            'quantity' => 0,
+            'stock' => $product->variants()->where('quantity', '>', 0)->exists(),
         ])->saveQuietly();
     }
 
@@ -368,7 +420,7 @@ class ImportInventory extends Command
         $value = str_replace(["\xc2\xa0", '№'], [' ', 'N'], $value);
         $value = preg_replace('/\s+/u', ' ', $value);
 
-        return trim((string) $value);
+        return Str::upper(trim((string) $value));
     }
 
     private function cleanText(mixed $value): string

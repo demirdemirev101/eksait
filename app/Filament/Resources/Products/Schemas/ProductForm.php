@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use App\Models\Product;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -51,6 +51,7 @@ class ProductForm
                             TextInput::make('weight')
                                 ->label('Тегло (кг)')
                                 ->numeric()
+                                ->default(0)
                                 ->suffix('кг'),
                         ]),
 
@@ -69,21 +70,14 @@ class ProductForm
                                 ->minValue(0.01),
                         ]),
 
-                        Toggle::make('stock')
-                            ->label('Следи наличност')
-                            ->reactive()
-                            ->afterStateUpdated(function ($state, callable $set): void {
-                                if ($state === false) {
-                                    $set('quantity', null);
-                                }
-                            }),
-
                         TextInput::make('quantity')
                             ->label('Количество')
                             ->numeric()
+                            ->integer()
                             ->minValue(0)
-                            ->nullable()
-                            ->visible(fn ($get) => $get('stock') === true),
+                            ->default(0)
+                            ->visible(fn (?Product $record): bool => $record === null || ! $record->variants()->exists())
+                            ->dehydrated(fn (?Product $record): bool => $record === null || ! $record->variants()->exists()),
                     ])
                     ->columnSpanFull(),
 
@@ -93,4 +87,3 @@ class ProductForm
             ]);
     }
 }
-

@@ -41,6 +41,11 @@ class Product extends Model
         'length' => 'decimal:2',
     ];
 
+    public function setNameAttribute(?string $value): void
+    {
+        $this->attributes['name'] = $value === null ? null : Str::upper(trim($value));
+    }
+
     /**
      * Define a many-to-many relationship for categories.
      */
@@ -87,6 +92,14 @@ class Product extends Model
     public static function booted()
     {
         static::saving(function (Product $product) {
+            if ($product->exists && $product->variants()->exists()) {
+                $product->quantity = 0;
+                $product->stock = $product->variants()->where('quantity', '>', 0)->exists();
+            } else {
+                $product->quantity = max(0, (int) ($product->quantity ?? 0));
+                $product->stock = $product->quantity > 0;
+            }
+
             if ($product->isDirty('name')) {
                 $baseSlug = Str::slug($product->name);
                 $slug = $baseSlug;

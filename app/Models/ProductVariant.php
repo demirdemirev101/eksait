@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class ProductVariant extends Model
 {
@@ -35,17 +36,38 @@ class ProductVariant extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function setSizeAttribute(?string $value): void
+    {
+        $this->attributes['size'] = $value === null ? null : Str::upper(trim($value));
+    }
+
     protected static function booted(): void
     {
         static::saving(function (self $variant): void {
-            // Quantity cannot be negative.
             $variant->quantity = max(0, (int) $variant->quantity);
-
-            // If quantity is zero, variant must be out of stock.
-            // Keep manual override possible for quantity > 0.
-            if ($variant->quantity === 0) {
-                $variant->stock = false;
-            }
+            $variant->stock = $variant->quantity > 0;
         });
+
+        static::saved(function (self $variant): void {
+            $variant->syncParentStockState();
+        });
+
+        static::deleted(function (self $variant): void {
+            $variant->syncParentStockState();
+        });
+    }
+
+    private function syncParentStockState(): void
+    {
+        $product = $this->product;
+
+        if (! $product) {
+            return;
+        }
+
+        $product->forceFill([
+            'quantity' => 0,
+            'stock' => $product->variants()->where('quantity', '>', 0)->exists(),
+        ])->saveQuietly();
     }
 }
