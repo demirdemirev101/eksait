@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Products\RelationManagers;
 
+use Illuminate\Database\Eloquent\Model;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -32,7 +33,7 @@ class VariantsRelationManager extends RelationManager
                     ->schema([
                         Grid::make(3)->schema([
                             TextInput::make('size')
-                                ->label('Размер')
+                                ->label('Тип/Размер')
                                 ->required()
                                 ->maxLength(255),
                             TextInput::make('price')
@@ -98,20 +99,21 @@ class VariantsRelationManager extends RelationManager
             ->recordTitleAttribute('size')
             ->columns([
                 TextColumn::make('size')
-                    ->label('Размер')
+                    ->label('Тип/Размер')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('price')
                     ->label('Цена')
                     ->money('EUR')
+                    ->placeholder('-')
                     ->sortable(),
                 TextColumn::make('sale_price')
                     ->label('Цена с отстъпка')
                     ->money('EUR')
-                    ->placeholder('-')
+                    ->visible(fn ($record): bool => filled($record?->sale_price))
                     ->sortable(),
                 IconColumn::make('stock')
-                    ->label('Наличнот')
+                    ->label('Наличност')
                     ->boolean(),
                 TextColumn::make('quantity')
                     ->label('Количество')
@@ -119,7 +121,7 @@ class VariantsRelationManager extends RelationManager
                 TextColumn::make('weight')
                     ->label('Тегло')
                     ->suffix(' kg')
-                    ->placeholder('-')
+                    ->visible(fn ($record): bool => filled($record?->weight))
                     ->sortable(),
             ])
             ->headerActions([

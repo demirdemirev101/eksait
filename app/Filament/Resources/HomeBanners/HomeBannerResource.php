@@ -48,7 +48,8 @@ class HomeBannerResource extends Resource
                     TextInput::make('sort_order')
                         ->label('Ред на показване')
                         ->numeric()
-                        ->default(0)
+                        ->default(fn (): int => ((int) HomeBanner::query()->max('sort_order')) + 1)
+                        ->minValue(1)
                         ->required(),
                     TextInput::make('eyebrow')
                         ->label('Надзаглавие')
@@ -122,4 +123,3 @@ class HomeBannerResource extends Resource
         ];
     }
 }
-

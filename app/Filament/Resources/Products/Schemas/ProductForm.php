@@ -75,11 +75,10 @@ class ProductForm
                             ->numeric()
                             ->integer()
                             ->minValue(0)
-                            ->default(0)
-                            ->visible(fn (?Product $record): bool => $record === null || ! $record->variants()->exists())
-                            ->dehydrated(fn (?Product $record): bool => $record === null || ! $record->variants()->exists()),
+                            ->default(0),
                     ])
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->visible(fn (?Product $record): bool => $record === null || ! $record->variants()->exists()),
 
                 RichEditor::make('extra_information')
                     ->label('Допълнителна информация')

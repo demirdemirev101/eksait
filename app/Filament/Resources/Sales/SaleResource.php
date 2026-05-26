@@ -56,6 +56,7 @@ class SaleResource extends Resource
                         Select::make('category_id')
                             ->label('Категория')
                             ->options(fn (): array => Category::query()
+                                ->whereNotNull('parent_id')
                                 ->orderBy('name')
                                 ->pluck('name', 'id')
                                 ->all())
