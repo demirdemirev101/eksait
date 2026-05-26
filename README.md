@@ -83,7 +83,7 @@ FRONTEND_URL=http://localhost:5173
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=freshwater
+DB_DATABASE=eksait
 DB_USERNAME=root
 DB_PASSWORD=
 
@@ -120,17 +120,10 @@ BANK_TRANSFER_CURRENCY=EUR
 
 Set `FRONTEND_URL` to the URL of the React or storefront client that consumes this API. Stripe checkout success and cancel URLs are built from this value.
 
-Use the demo Econt base URL for sandbox testing:
+Use one of these values for `ECONT_BASE_URL` depending on the environment:
 
-```env
-ECONT_BASE_URL=https://demo.econt.com/ee/services
-```
-
-Use the production Econt base URL only with production credentials:
-
-```env
-ECONT_BASE_URL=https://ee.econt.com/services
-```
+- `https://demo.econt.com/ee/services` for sandbox testing
+- `https://ee.econt.com/services` for production credentials
 
 `php artisan test:econt-api` reads `ECONT_BASE_URL`, `ECONT_VERIFY_SSL`, `ECONT_USERNAME`, and `ECONT_PASSWORD` through `config/services.php`. It does not print the configured username or password.
 
