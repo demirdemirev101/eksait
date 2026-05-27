@@ -46,10 +46,12 @@ class ProductsTable
                     ->sortable()
                     ->visible(fn ($record): bool => ($record->variants_count ?? 0) > 0),
                 TextColumn::make('created_at')
+                    ->label('Дата на създаване')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
+                    ->label('Дата на актуализиране')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
