@@ -29,7 +29,8 @@ class OrdersTable
                     ->searchable(),
                 TextColumn::make('customer_phone')
                     ->label('Телефонен номер')
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(false),
                 TextColumn::make('shipping_method')
                     ->label('Доставка')
                     ->state(fn ($record) => match ($record->shipping_method) {
@@ -63,7 +64,8 @@ class OrdersTable
                                 ->orWhere('econt_office_name', 'like', "%{$search}%")
                                 ->orWhere('econt_office_code', 'like', "%{$search}%");
                         });
-                    }),
+                    })
+                    ->visible(false),
                 TextColumn::make('status')
                     ->label('Статус на поръчката')
                     ->state(fn ($record) => OrderStatus::tryFrom($record->status)?->label() ?? $record->status)
@@ -102,7 +104,7 @@ class OrdersTable
                     ->state(fn ($record) => match ($record->payment_method) {
                         'cod' => 'Наложен платеж',
                         'bank_transfer' => 'Банков превод',
-                        'stripe' => 'Stripe',
+                        'stripe' => 'Карта (Stripe)',
                         default => $record->payment_method,
                     })
                     ->badge()
@@ -113,10 +115,12 @@ class OrdersTable
                         default => 'gray',
                     }),
                 TextColumn::make('created_at')
+                    ->label('Дата на създаване')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
+                    ->label('Дата на актуализиране')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -127,14 +131,13 @@ class OrdersTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->authorize(fn ($record) =>($record->status === 'pending_review'
-                            || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid'))),
+                    ->visible(fn ($record) => $record->status === OrderStatus::CANCELLED->value),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->authorize(fn (? \Illuminate\Database\Eloquent\Model $record) => $record
-                            ? ( ($record->status === 'pending_review'
+                            ? (($record->status === 'pending_review'
                                     || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid')))
                             : true),
                 ]),

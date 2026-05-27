@@ -16,7 +16,7 @@ class CategoryForm
                     ->label('Име')
                     ->required(),
                 TextInput::make('slug')
-                    ->label('Slug')
+                    ->label('Кратък адрес')
                     ->dehydrated()
                     ->hidden()
                     ->disabled()

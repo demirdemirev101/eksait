@@ -181,6 +181,16 @@ class OrderService
     public function deleteOrderWithItems(Order $order): void
     {
           DB::transaction(function () use ($order) {
+            $order->loadMissing(['items.product', 'items.variant']);
+
+            foreach ($order->items as $item) {
+                if ($item->variant) {
+                    $this->stockService->releaseVariant($item->variant, (int) $item->quantity);
+                } elseif ($item->product) {
+                    $this->stockService->release($item->product, (int) $item->quantity);
+                }
+            }
+
             $order->items()->delete();
             $order->delete();
         });

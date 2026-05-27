@@ -25,7 +25,7 @@ class CategoriesTable
                     ->label('Родител')
                     ->placeholder('-'),
                 TextColumn::make('slug')
-                    ->label('Slug')
+                    ->label('Кратък адрес')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('parent_id')

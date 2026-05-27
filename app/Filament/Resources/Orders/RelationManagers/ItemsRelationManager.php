@@ -28,10 +28,9 @@ class ItemsRelationManager extends RelationManager
     protected static ?string $modelLabel = 'Артикул';
     protected static ?string $pluralModelLabel = 'Поръчани артикули';
 
-   
-    /* 
-    * This method is used to determine if the order is locked for editing items. 
-    * An order is considered locked if its status is not 'pending_review' or if it's a bank transfer
+    /*
+    * This method is used to determine if the order is locked for editing items.
+    * An order is considered locked if its status is not 'pending_review' or if it's a bank transfer.
     */
     #[On('orderUpdated')]
     public function refreshFromOrderUpdate(): void
@@ -56,7 +55,7 @@ class ItemsRelationManager extends RelationManager
             return true;
         }
 
-        return ! ($order->status === OrderStatus::PENDING_REVIEW->value 
+        return ! ($order->status === OrderStatus::PENDING_REVIEW->value
         || ($order->payment_method === 'bank_transfer' && $order->payment_status !== PaymentStatus::PAID->value));
     }
 
@@ -73,7 +72,7 @@ class ItemsRelationManager extends RelationManager
                     ->afterStateUpdated(fn ($set) => $set('product_variant_id', null)),
 
                 Select::make('product_variant_id')
-                    ->label('Variant')
+                    ->label('Вариант')
                     ->options(fn ($get): array => ProductVariant::query()
                         ->where('product_id', $get('product_id'))
                         ->orderBy('size')
@@ -108,11 +107,11 @@ class ItemsRelationManager extends RelationManager
                     ->sortable(),
 
                 TextColumn::make('variant.size')
-                    ->label('Variant')
+                    ->label('Вариант')
                     ->placeholder('-'),
 
                 TextColumn::make('price')
-                    ->label('Цена')
+                    ->label('Ед. цена')
                     ->money('EUR')
                     ->sortable(),
 
@@ -126,10 +125,12 @@ class ItemsRelationManager extends RelationManager
                     ->sortable(),
 
                 TextColumn::make('created_at')
+                    ->label('Създаден на')
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('updated_at')
+                    ->label('Обновен на')
                     ->dateTime()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -137,7 +138,7 @@ class ItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                /* 
+                /*
                 * The CreateAction is customized to use the OrderItemService for creating new order items
                 * and it dispatches an 'orderUpdated' event after creation to allow the parent order page to refresh its data.
                 */
@@ -157,7 +158,7 @@ class ItemsRelationManager extends RelationManager
             ])
             ->recordActions([
                 /*
-                * The EditAction is customized to use the OrderItemService for updating existing order items. 
+                * The EditAction is customized to use the OrderItemService for updating existing order items.
                 * It updates the quantity of the order item and dispatches an 'orderUpdated' event after the update.
                 * The DeleteAction is also customized to use the OrderItemService for deleting order items and dispatching the same event after deletion.
                 */
@@ -181,7 +182,7 @@ class ItemsRelationManager extends RelationManager
             ->toolbarActions([
                 /**
                  * The DeleteBulkAction is customized to use the OrderItemService for deleting multiple order items at once.
-                 * It iterates through the selected records and deletes each one using the service, then dispatches an 'orderUpdated' 
+                 * It iterates through the selected records and deletes each one using the service, then dispatches an 'orderUpdated'
                  * event after the bulk deletion to refresh the parent order page data.
                  */
                 DeleteBulkAction::make()

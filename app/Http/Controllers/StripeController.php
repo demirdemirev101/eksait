@@ -5,17 +5,16 @@ namespace App\Http\Controllers;
 use App\Events\OrderPlaced;
 use App\Events\OrderReadyForShipment;
 use App\Models\Order;
+use App\Services\OrderService;
 use App\Services\StripeRefundService;
-use App\Services\StockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Stripe\Webhook;
 
 class StripeController extends Controller
 {
-    public function webhook(Request $request, StockService $stockService): JsonResponse
+    public function webhook(Request $request, OrderService $orderService): JsonResponse
     {
         $payload = $request->getContent();
         $signature = $request->header('Stripe-Signature');
@@ -44,10 +43,12 @@ class StripeController extends Controller
                     'stripe_payment_status' => $session->payment_status ?? null,
                 ]);
 
+                $this->cleanupPendingStripeOrder($orderId, $orderService);
+
                 return response()->json(['received' => true]);
             }
 
-            $shouldDispatchEvents = DB::transaction(function () use ($orderId, $session) {
+            $shouldDispatchEvents = \DB::transaction(function () use ($orderId, $session) {
                 $order = Order::whereKey($orderId)->lockForUpdate()->first();
 
                 if (! $order || $order->payment_status === 'paid') {
@@ -98,31 +99,7 @@ class StripeController extends Controller
             $session = $event->data->object;
             $orderId = $session->metadata->order_id ?? null;
 
-            DB::transaction(function () use ($orderId, $stockService) {
-                $order = Order::with(['items.product', 'items.variant'])
-                    ->whereKey($orderId)
-                    ->where('payment_method', 'stripe')
-                    ->where('payment_status', 'pending')
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $order) {
-                    return;
-                }
-
-                $order->update([
-                    'payment_status' => 'failed',
-                    'status' => 'cancelled',
-                ]);
-
-                foreach ($order->items as $item) {
-                    if ($item->variant) {
-                        $stockService->releaseVariant($item->variant, (int) $item->quantity);
-                    } elseif ($item->product) {
-                        $stockService->release($item->product, (int) $item->quantity);
-                    }
-                }
-            });
+            $this->cleanupPendingStripeOrder($orderId, $orderService);
         }
 
         if ($event->type === 'charge.succeeded') {
@@ -182,5 +159,28 @@ class StripeController extends Controller
         }
 
         return response()->json(['received' => true]);
+    }
+
+    private function cleanupPendingStripeOrder(?int $orderId, OrderService $orderService): void
+    {
+        if (! $orderId) {
+            return;
+        }
+
+        $order = Order::query()
+            ->whereKey($orderId)
+            ->where('payment_method', 'stripe')
+            ->where('payment_status', 'pending')
+            ->first();
+
+        if (! $order) {
+            return;
+        }
+
+        $orderService->deleteOrderWithItems($order);
+
+        Log::info('Pending Stripe order removed after unsuccessful checkout', [
+            'order_id' => $orderId,
+        ]);
     }
 }

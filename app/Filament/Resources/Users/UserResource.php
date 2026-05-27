@@ -36,7 +36,7 @@ class UserResource extends Resource
                     ->label('Име')
                     ->required(),
                 TextInput::make('email')
-                    ->label('Email адрес')
+                    ->label('Имейл адрес')
                     ->email()
                     ->required(),
                 TextInput::make('phone')
@@ -58,7 +58,7 @@ class UserResource extends Resource
                     ->label('Име')
                     ->searchable(),
                 TextColumn::make('email')
-                    ->label('Email адрес'),
+                    ->label('Имейл адрес'),
                 TextColumn::make('roles')
                     ->label('Роля')
                     ->badge()

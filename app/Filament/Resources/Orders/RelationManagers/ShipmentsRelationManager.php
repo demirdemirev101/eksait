@@ -4,12 +4,11 @@ namespace App\Filament\Resources\Orders\RelationManagers;
 
 use App\Enums\OrderStatus;
 use Carbon\Carbon;
-use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables\Table;
 use Filament\Actions\Action;
+use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 
 class ShipmentsRelationManager extends RelationManager
@@ -23,7 +22,7 @@ class ShipmentsRelationManager extends RelationManager
     {
         $this->getOwnerRecord()?->refresh();
 
-        // важно: typed property може още да не е инициализирана
+        // Important: typed property may still be uninitialized.
         if (! isset($this->table)) {
             return;
         }
@@ -43,6 +42,7 @@ class ShipmentsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->poll(fn (): ?string => $this->shouldPollForStripeShipment() ? '5s' : null)
             ->columns([
                 TextColumn::make('carrier')
                     ->label('Куриер')
@@ -69,7 +69,7 @@ class ShipmentsRelationManager extends RelationManager
                         'success' => 'delivered',
                         'danger' => ['error', 'cancelled'],
                     ])
-                    ->formatStateUsing(fn ($state) => match($state) {
+                    ->formatStateUsing(fn ($state) => match ($state) {
                         'created' => 'Създаден',
                         'pending' => 'Чака',
                         'confirmed' => 'Потвърден',
@@ -77,9 +77,9 @@ class ShipmentsRelationManager extends RelationManager
                         'in_transit' => 'В транспорт',
                         'delivered' => 'Доставен',
                         'error' => 'Грешка',
-                        'returning' => 'Returning to sender',
-                        'returned' => 'Returned to sender',
-                        'cancelled' => 'Cancelled',
+                        'returning' => 'Връща се към подателя',
+                        'returned' => 'Върнат на подателя',
+                        'cancelled' => 'Отменен',
                         default => $state,
                     }),
 
@@ -128,10 +128,10 @@ class ShipmentsRelationManager extends RelationManager
                     ->color('success')
                     ->url(fn ($record) => $record->label_url)
                     ->openUrlInNewTab()
-                    ->authorize(fn ($record) => !empty($record->label_url) 
+                    ->authorize(fn ($record) => !empty($record->label_url)
                     && $record->status !== 'cancelled'),
             ])
-            ->emptyStateHeading('Няма доставка')
+            ->emptyStateHeading('Няма доставки')
             ->emptyStateIcon('heroicon-o-truck');
     }
 
@@ -147,5 +147,16 @@ class ShipmentsRelationManager extends RelationManager
     public function isReadOnly(): bool
     {
         return false;
+    }
+
+    private function shouldPollForStripeShipment(): bool
+    {
+        $order = $this->getOwnerRecord();
+
+        if (! $order || $order->payment_method !== 'stripe') {
+            return false;
+        }
+
+        return ! $order->shipments()->exists();
     }
 }

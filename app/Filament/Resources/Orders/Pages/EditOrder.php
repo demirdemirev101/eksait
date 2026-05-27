@@ -190,8 +190,8 @@ class EditOrder extends EditRecord
 
                                 Notification::make()
                                     ->danger()
-                                    ->title('Econt label cancel failed')
-                                    ->body('The order was cancelled locally, but the label could not be cancelled in Econt.')
+                                    ->title('Неуспешно анулиране на етикет в Econt')
+                                    ->body('Поръчката е отказана локално, но етикетът не можа да бъде анулиран в Econt.')
                                     ->send();
                             }
                         } else {
@@ -245,7 +245,7 @@ class EditOrder extends EditRecord
                     $this->refreshUi();
                 }),
             Action::make('refund_stripe_payment')
-                ->label('Върни плащане Stripe')
+                ->label('Върни плащане чрез Stripe')
                 ->icon('heroicon-o-arrow-path-rounded-square')
                 ->color('danger')
                 ->visible(fn () => $this->record->payment_method === 'stripe'
@@ -271,7 +271,7 @@ class EditOrder extends EditRecord
                         ->required(),
                 ])
                 ->requiresConfirmation()
-                ->modalHeading('Връщане на Stripe плащане')
+                ->modalHeading('Връщане на плащане чрез Stripe')
                 ->modalDescription('Сумата ще бъде върната през Stripe. При пълно връщане поръчката ще бъде маркирана като върната.')
                 ->modalSubmitActionLabel('Върни сумата')
                 ->action(function (array $data) {
@@ -280,7 +280,7 @@ class EditOrder extends EditRecord
 
                         Notification::make()
                             ->success()
-                            ->title('Stripe refund е изпратен')
+                            ->title('Възстановяването чрез Stripe е изпратено')
                             ->body('Статусът на поръчката беше обновен.')
                             ->send();
 
@@ -288,7 +288,7 @@ class EditOrder extends EditRecord
                     } catch (\Throwable $e) {
                         Notification::make()
                             ->danger()
-                            ->title('Stripe refund неуспешен')
+                            ->title('Неуспешно възстановяване чрез Stripe')
                             ->body($e->getMessage())
                             ->send();
                     }

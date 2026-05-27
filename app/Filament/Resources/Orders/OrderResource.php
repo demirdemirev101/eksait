@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Orders;
 
+use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Pages\CreateOrder;
 use App\Filament\Resources\Orders\Pages\EditOrder;
 use App\Filament\Resources\Orders\Pages\ListOrders;
@@ -55,6 +56,29 @@ class OrderResource extends Resource
             ItemsRelationManager::class,
             ShipmentsRelationManager::class, 
         ];
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::getUnprocessedOrdersCount();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return static::getUnprocessedOrdersCount() > 0 ? 'warning' : null;
+    }
+
+    protected static function getUnprocessedOrdersCount(): int
+    {
+        return static::getEloquentQuery()
+            ->whereIn('status', [
+                OrderStatus::PENDING->value,
+                OrderStatus::PENDING_REVIEW->value,
+                OrderStatus::PROCESSING->value,
+            ])
+            ->count();
     }
 
     public static function getPages(): array

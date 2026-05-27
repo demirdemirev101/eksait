@@ -21,7 +21,7 @@ class SettingsTable
                     ->trueColor('success')
                     ->falseColor('danger'),
                 IconColumn::make('stripe_enabled')
-                    ->label('Stripe')
+                    ->label('Stripe плащане')
                     ->boolean()
                     ->trueIcon('heroicon-o-check-circle')
                     ->falseIcon('heroicon-o-x-circle')
