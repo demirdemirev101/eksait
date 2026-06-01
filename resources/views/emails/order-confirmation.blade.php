@@ -75,11 +75,43 @@
         </table>
     @endif
 
-    <div class="section-title">Адрес за доставка</div>
+    @php
+        $shippingMethodLabels = [
+            'address' => 'Адрес за доставка',
+            'office' => 'Офис за доставка',
+            'apm' => 'Еконтомат за доставка',
+        ];
+
+        $shippingCityLine = trim(implode(' ', array_filter([
+            $order->shipping_postcode,
+            $order->shipping_city,
+        ])));
+
+        $shippingLines = $order->shipping_method === 'address'
+            ? [
+                $order->customer_name,
+                $order->customer_phone ? 'Телефон: ' . $order->customer_phone : null,
+                $order->shipping_address,
+                $shippingCityLine,
+            ]
+            : [
+                $order->customer_name,
+                $order->customer_phone ? 'Телефон: ' . $order->customer_phone : null,
+                $order->econt_office_address,
+                $order->econt_office_code ? 'Код: ' . $order->econt_office_code : null,
+                $shippingCityLine ? 'Град: ' . $shippingCityLine : null,
+            ];
+
+        $shippingLines = array_values(array_filter($shippingLines, fn ($line) => filled($line)));
+    @endphp
+
+    <div class="section-title">{{ $shippingMethodLabels[$order->shipping_method] ?? 'Адрес за доставка' }}</div>
     <div class="info-box">
-        <strong>{{ $order->customer_name }}</strong><br>
-        {{ $order->shipping_address }}<br>
-        {{ $order->shipping_city }}
+        @forelse ($shippingLines as $line)
+            {{ $line }}@if (! $loop->last)<br>@endif
+        @empty
+            Няма въведени данни за доставка.
+        @endforelse
     </div>
 
     <p style="margin: 0; color: #555555; font-size: 14px; line-height: 1.7;">
