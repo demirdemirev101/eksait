@@ -17,7 +17,7 @@ class OrdersTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->poll('10s')
+            ->poll('300s')
             ->columns([
                 TextColumn::make('user_id')
                     ->label('Тип')

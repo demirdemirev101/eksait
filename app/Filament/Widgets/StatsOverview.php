@@ -13,6 +13,8 @@ class StatsOverview extends StatsOverviewWidget
 {
     protected static ?int $sort = 1;
 
+    protected ?string $pollingInterval = '300s';
+
     protected function getStats(): array
     {
         $todayRevenue = $this->revenueQuery()

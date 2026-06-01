@@ -12,7 +12,7 @@ class RevenuePerDayChart extends ChartWidget
 {
     protected ?string $heading = 'Приходи за последните 30 дни';
 
-    protected ?string $pollingInterval = '100s';
+    protected ?string $pollingInterval = '300s';
 
     protected int | string | array $columnSpan = 'full';
 

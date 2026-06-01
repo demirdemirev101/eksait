@@ -20,6 +20,7 @@ class LatestOrdersWidget extends TableWidget
     {
         return $table
             ->heading('Последни поръчки')
+            ->poll('300s')
             ->query(Order::query()->latest())
             ->defaultPaginationPageOption(5)
             ->paginated([5, 10])
