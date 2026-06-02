@@ -5,7 +5,6 @@ namespace App\Listeners;
 use App\Events\ShipmentCreated;
 use App\Jobs\NotifyAdminShipmentFailedJob;
 use App\Jobs\SendTrackingEmailJob;
-use App\Models\Order;
 use App\Models\Shipment;
 use App\Services\EcontShippingService;
 use App\Support\ErrorMessages;
@@ -19,7 +18,9 @@ class SendShipmentToEcont implements ShouldQueue
     use InteractsWithQueue;
 
     public $tries = 3;
+
     public $timeout = 60;
+
     public $backoff = [30, 60, 120];
 
     public function __construct(
@@ -44,7 +45,7 @@ class SendShipmentToEcont implements ShouldQueue
         if (! config('services.econt.enabled')) {
             $shipment->update([
                 'status' => 'confirmed',
-                'tracking_number' => 'TEST-' . $shipment->id,
+                'tracking_number' => 'TEST-'.$shipment->id,
                 'carrier_response' => [
                     'message' => 'Econt disabled (local environment)',
                 ],
@@ -140,27 +141,27 @@ class SendShipmentToEcont implements ShouldQueue
 
         $shipment->update([
             'status' => $status,
-            'error_message' => ErrorMessages::SHIPMENT_CREATE_FAILED . ' ' . $errorMessage,
+            'error_message' => ErrorMessages::SHIPMENT_CREATE_FAILED.' '.$errorMessage,
         ]);
     }
 
     public function failed($event, \Throwable $exception): void
     {
-        $order = Order::with('shipment')->find($event->orderId);
+        $shipment = Shipment::with('order')->find($event->shipmentId);
 
-        if ($order && $order->shipment) {
-            $order->shipment->update([
+        if ($shipment) {
+            $shipment->update([
                 'status' => 'error',
-                'error_message' => ErrorMessages::SHIPMENT_CREATE_FAILED_AFTER_RETRIES . ' ' . $exception->getMessage(),
+                'error_message' => ErrorMessages::SHIPMENT_CREATE_FAILED_AFTER_RETRIES.' '.$exception->getMessage(),
             ]);
 
             Log::critical('Econt shipment job failed permanently', [
-                'order_id' => $order->id,
-                'shipment_id' => $order->shipment->id,
+                'order_id' => $shipment->order_id,
+                'shipment_id' => $shipment->id,
                 'error' => $exception->getMessage(),
             ]);
 
-            dispatch(new NotifyAdminShipmentFailedJob($order->shipment->id));
+            dispatch(new NotifyAdminShipmentFailedJob($shipment->id));
         }
     }
 }

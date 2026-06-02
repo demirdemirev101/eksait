@@ -5,30 +5,25 @@ namespace App\Filament\Resources\Orders\Pages;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\OrderReadyForShipment;
-use App\Events\ShipmentCreated;
 use App\Filament\Resources\Orders\OrderResource;
-use App\Mail\OrderCancelledMail;
-use App\Mail\OrderReturnRequestedMail;
 use App\Policies\CancelOrderPolicy;
 use App\Policies\ConfirmBankTransferPolicy;
 use App\Policies\IsOrderLockedPolicy;
 use App\Policies\ShipmentPollingPolicy;
-use App\Services\Econt\EcontService;
-use App\Services\EcontShippingService;
-use App\Services\Shipment\ShipmentCancellationService;
+use App\Services\OrderCancellationService;
+use App\Services\OrderReturnRequestService;
 use App\Services\Shipment\ShipmentTrackingSyncService;
 use App\Services\StripeRefundService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class EditOrder extends EditRecord
 {
     protected static string $resource = OrderResource::class;
+
     protected string $view = 'filament.resources.orders.pages.edit-order';
 
     public function handleOrderRefresh(): void
@@ -129,99 +124,64 @@ class EditOrder extends EditRecord
                 }),
 
             Action::make('cancel_order')
-                ->label('Откажи поръчка')
+                ->label(fn () => $this->record->payment_method === 'stripe'
+                    ? 'Откажи и върни плащане'
+                    : 'Откажи поръчка')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
-                ->visible(fn () => $this->record->payment_method !== 'stripe'
-                    && app(CancelOrderPolicy::class)->canCancelOrder($this->record))
+                ->visible(fn () => app(CancelOrderPolicy::class)->canCancelOrder($this->record))
                 ->requiresConfirmation()
                 ->modalHeading('Отказ на поръчка')
-                ->modalDescription('Сигурни ли сте, че искате да откажете поръчката?')
+                ->modalDescription(fn () => $this->record->payment_method === 'stripe'
+                    ? 'Ще бъде анулирана товарителницата в Econt, ще бъде върната оставащата сума през Stripe и поръчката ще бъде отказана.'
+                    : 'Ще бъде анулирана товарителницата в Econt, ако има такава, и поръчката ще бъде отказана.')
                 ->action(function () {
-                    $this->record->updateQuietly([
-                        'status' => OrderStatus::CANCELLED->value,
-                    ]);
+                    try {
+                        app(OrderCancellationService::class)->cancel($this->record);
 
-                    $shipment = $this->record->shipment;
-                    if ($shipment && ! empty($shipment->carrier_shipment_id)) {
-                        if (config('services.econt.enabled')) {
-                            try {
-                                $deleteResponse = app(EcontService::class)->deleteLabels([$shipment->carrier_shipment_id]);
-                                Log::info('Econt delete label success', [
-                                    'order_id' => $this->record->id,
-                                    'shipment_id' => $shipment->id,
-                                    'carrier_shipment_id' => $shipment->carrier_shipment_id,
-                                    'response' => $deleteResponse,
-                                ]);
-                                app(ShipmentCancellationService::class)->clearCancelledShipmentData($shipment);
-                            } catch (\Throwable $e) {
-                                Log::error('Econt delete label failed', [
-                                    'order_id' => $this->record->id,
-                                    'shipment_id' => $shipment->id,
-                                    'error' => $e->getMessage(),
-                                ]);
+                        Notification::make()
+                            ->success()
+                            ->title('Поръчката е отказана')
+                            ->body($this->record->payment_method === 'stripe'
+                                ? 'Товарителницата беше анулирана и плащането беше върнато, ако е било постъпило.'
+                                : 'Товарителницата беше анулирана, ако имаше такава, и клиентът беше уведомен.')
+                            ->send();
 
-                                Notification::make()
-                                    ->danger()
-                                    ->title('Неуспешно анулиране на етикет в Econt')
-                                    ->body('Поръчката е отказана локално, но етикетът не можа да бъде анулиран в Econt.')
-                                    ->send();
-                            }
-                        } else {
-                            app(ShipmentCancellationService::class)->clearCancelledShipmentData($shipment, [
-                                'error_message' => 'Econt disabled (local environment)',
-                            ]);
-                        }
-                    } elseif ($shipment) {
-                        app(ShipmentCancellationService::class)->clearCancelledShipmentData($shipment);
+                        $this->refreshUi();
+                    } catch (\Throwable $e) {
+                        Log::error('Order cancellation failed', [
+                            'order_id' => $this->record->id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        Notification::make()
+                            ->danger()
+                            ->title('Неуспешен отказ на поръчка')
+                            ->body($e->getMessage())
+                            ->send();
                     }
-
-                    if ($this->record->customer_email) {
-                        Mail::to($this->record->customer_email)->send(new OrderCancelledMail($this->record->id));
-                    }
-
-                    Notification::make()
-                        ->success()
-                        ->title('Поръчката е отказана')
-                        ->body('Клиентът беше уведомен по имейл.')
-                        ->send();
-
-                    $this->refreshUi();
                 }),
 
             Action::make('request_return')
                 ->label('Заяви връщане')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('warning')
-                ->visible(fn () => $this->record->payment_method !== 'stripe'
-                    && app(CancelOrderPolicy::class)->canRequestReturn($this->record))
+                ->visible(fn () => app(CancelOrderPolicy::class)->canRequestReturn($this->record))
                 ->requiresConfirmation()
                 ->modalHeading('Заявка за връщане')
-                ->modalDescription('Сигурни ли сте, че искате да заявите връщане на поръчката?')
+                ->modalDescription(fn () => $this->record->payment_method === 'stripe'
+                    ? 'Ще бъде създадена обратна пратка към Econt и оставащата сума ще бъде върната през Stripe.'
+                    : 'Ще бъде създадена обратна пратка към Econt.')
                 ->action(function () {
                     try {
-                        $shipment = null;
-
-                        DB::transaction(function () use (&$shipment) {
-                            $shipment = app(EcontShippingService::class)->createReturnShipmentRecord($this->record);
-
-                            $this->record->updateQuietly([
-                                'status' => OrderStatus::RETURN_REQUESTED->value,
-                            ]);
-                        });
-
-                        if ($shipment) {
-                            event(new ShipmentCreated($shipment->id, $this->record->id));
-                        }
-
-                        if ($this->record->customer_email) {
-                            Mail::to($this->record->customer_email)->send(new OrderReturnRequestedMail($this->record->id));
-                        }
+                        app(OrderReturnRequestService::class)->requestReturn($this->record);
 
                         Notification::make()
                             ->success()
                             ->title('Заявено е връщане')
-                            ->body('Създадена е обратна пратка към Econt и клиентът беше уведомен.')
+                            ->body($this->record->payment_method === 'stripe'
+                                ? 'Създадена е обратна пратка към Econt, Stripe плащането беше обработено и клиентът беше уведомен.'
+                                : 'Създадена е обратна пратка към Econt и клиентът беше уведомен.')
                             ->send();
 
                         $this->refreshUi();
@@ -249,7 +209,12 @@ class EditOrder extends EditRecord
                         PaymentStatus::PARTIALLY_REFUNDED->value,
                     ], true)
                     && filled($this->record->stripe_payment_intent_id)
-                    && (float) $this->record->refunded_amount < (float) $this->record->total)
+                    && (float) $this->record->refunded_amount < (float) $this->record->total
+                    && ! app(CancelOrderPolicy::class)->canCancelOrder($this->record)
+                    && (
+                        ! app(CancelOrderPolicy::class)->canRequestReturn($this->record)
+                        || $this->record->status === OrderStatus::RETURN_REQUESTED->value
+                    ))
                 ->schema([
                     TextInput::make('amount')
                         ->label('Сума за връщане')
@@ -267,11 +232,19 @@ class EditOrder extends EditRecord
                 ])
                 ->requiresConfirmation()
                 ->modalHeading('Връщане на плащане чрез Stripe')
-                ->modalDescription('Сумата ще бъде върната през Stripe. При пълно връщане поръчката ще бъде маркирана като върната.')
+                ->modalDescription(fn () => $this->record->status === OrderStatus::RETURN_REQUESTED->value
+                    ? 'Сумата ще бъде върната през Stripe, а поръчката ще остане със заявено връщане до доставяне на обратната пратка.'
+                    : 'Сумата ще бъде върната през Stripe. При пълно връщане поръчката ще бъде маркирана като върната.')
                 ->modalSubmitActionLabel('Върни сумата')
                 ->action(function (array $data) {
                     try {
-                        app(StripeRefundService::class)->refund($this->record, (float) $data['amount']);
+                        app(StripeRefundService::class)->refund(
+                            $this->record,
+                            (float) $data['amount'],
+                            $this->record->status === OrderStatus::RETURN_REQUESTED->value
+                                ? OrderStatus::RETURN_REQUESTED
+                                : null,
+                        );
 
                         Notification::make()
                             ->success()

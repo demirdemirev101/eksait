@@ -18,7 +18,7 @@ class StripeRefundService
         $this->stripe = new StripeClient(config('services.stripe.sk'));
     }
 
-    public function refund(Order $order, float $amount): Refund
+    public function refund(Order $order, float $amount, ?OrderStatus $fullyRefundedOrderStatus = null): Refund
     {
         if ($order->payment_method !== 'stripe') {
             throw new \InvalidArgumentException('Refunds from this action are available only for Stripe orders.');
@@ -47,14 +47,18 @@ class StripeRefundService
             ],
         ]);
 
-        $this->applyRefund($order, $refund->id, $amount);
+        $this->applyRefund($order, $refund->id, $amount, $fullyRefundedOrderStatus);
 
         return $refund;
     }
 
-    public function applyRefund(Order $order, ?string $refundId, float $amount): void
-    {
-        DB::transaction(function () use ($order, $refundId, $amount): void {
+    public function applyRefund(
+        Order $order,
+        ?string $refundId,
+        float $amount,
+        ?OrderStatus $fullyRefundedOrderStatus = null
+    ): void {
+        DB::transaction(function () use ($order, $refundId, $amount, $fullyRefundedOrderStatus): void {
             $lockedOrder = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
 
             $refundedAmount = min(
@@ -72,7 +76,7 @@ class StripeRefundService
                     ? PaymentStatus::REFUNDED->value
                     : PaymentStatus::PARTIALLY_REFUNDED->value,
                 'status' => $isFullyRefunded
-                    ? OrderStatus::RETURNED->value
+                    ? ($fullyRefundedOrderStatus?->value ?? OrderStatus::RETURNED->value)
                     : $lockedOrder->status,
             ]);
         });

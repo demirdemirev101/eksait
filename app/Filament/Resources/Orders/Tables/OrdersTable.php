@@ -18,7 +18,8 @@ class OrdersTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->poll('300s')
+            ->poll('5s')
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('user_id')
                     ->label('Тип')

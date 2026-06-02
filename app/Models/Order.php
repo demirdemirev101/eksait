@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Facades\Auth;
 
 class Order extends Model
 {
@@ -48,7 +46,8 @@ class Order extends Model
         'stripe_refund_id',
         'refunded_amount',
         'refunded_at',
-        'notes'
+        'stock_released_at',
+        'notes',
     ];
 
     /**
@@ -60,23 +59,26 @@ class Order extends Model
         'admin_notification_sent_at' => 'datetime',
         'refunded_at' => 'datetime',
         'refunded_amount' => 'decimal:2',
+        'stock_released_at' => 'datetime',
         'econt_office_is_aps' => 'boolean',
     ];
 
     /**
      * Define a belongs-to relationship to the User model, indicating that each Order is associated with a single User.
      */
-    public function user() : BelongsTo
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
+
     /**
      * Define a has-many relationship to the OrderItem model, indicating that each Order can have multiple associated OrderItems.
      */
-    public function items() : HasMany
+    public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
     }
+
     /**
      * Boot method to handle model events. When creating an order, set user_id to null if not provided,
      * indicating a guest checkout. Otherwise it will automatically link the order to the user_id if provided,
@@ -90,6 +92,7 @@ class Order extends Model
             }
         });
     }
+
     /**
      * Define a has-one relationship to the Shipment model, indicating that each Order can have a single associated Shipment.
      */

@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Exceptions\CheckoutException;
 use App\Events\OrderPlaced;
+use App\Exceptions\CheckoutException;
 use App\Jobs\CalculateBankTransferShippingJob;
 use App\Models\Order;
 use App\Models\Product;
@@ -15,20 +15,19 @@ use Illuminate\Support\Facades\DB;
 class OrderService
 {
     public function __construct(
-            protected SettingsService $settingsService,
-            private PaymentService $paymentService,
-            private CartService $cartService,
-            private StockService $stockService
-        ) 
-        {}
+        protected SettingsService $settingsService,
+        private PaymentService $paymentService,
+        private CartService $cartService,
+        private StockService $stockService
+    ) {}
 
     /**
      * Recalculate the total for a given order. This method performs the following steps:
      *  1. It calculates the subtotal by summing the total of all items associated with the order.
      *  2. It applies the shipping rules and recalculates the shipping price using the SettingsService.
      *  3. It saves the updated order totals to the database without triggering model events.
-     *  4. It refreshes the order instance to ensure it has the latest data from the database.  
-    */
+     *  4. It refreshes the order instance to ensure it has the latest data from the database.
+     */
     public function recalculateTotal(Order $order): void
     {
         $order->subtotal = $order->items()->sum('total');
@@ -50,15 +49,15 @@ class OrderService
 
             $order = Order::create([
                 // If the user is authenticated, associate the order with the user's ID. Otherwise, the order will be created without a user association.
-                'user_id'           => $user?->id,
-                'customer_name'     => $user?->name ?? $data['customer_name'],
-                'customer_email'    => $user?->email ?? $data['customer_email'],
-                'customer_phone'    => $user?->phone ?? ($data['customer_phone'] ?? null),
+                'user_id' => $user?->id,
+                'customer_name' => $user?->name ?? $data['customer_name'],
+                'customer_email' => $user?->email ?? $data['customer_email'],
+                'customer_phone' => $user?->phone ?? ($data['customer_phone'] ?? null),
 
-                'shipping_address'  => $data['shipping_address'] ?? '',
-                'shipping_city'     => $data['shipping_city'],
+                'shipping_address' => $data['shipping_address'] ?? '',
+                'shipping_city' => $data['shipping_city'],
                 'shipping_postcode' => $data['shipping_postcode'] ?? null,
-                'shipping_method'   => $shippingMethod,
+                'shipping_method' => $shippingMethod,
                 'econt_office_code' => $shippingMethod === 'address'
                     ? null
                     : ($data['econt_office_code'] ?? null),
@@ -73,16 +72,16 @@ class OrderService
                     : (bool) ($data['econt_office_is_aps'] ?? false),
                 'holiday_delivery_day' => $data['holiday_delivery_day'] ?? null,
 
-                'status'            => 'pending',
+                'status' => 'pending',
 
-                'subtotal'          => 0,
-                'shipping_price'    => 0,
-                'total'             => 0,
+                'subtotal' => 0,
+                'shipping_price' => 0,
+                'total' => 0,
 
-                'payment_method'    => $data['payment_method'],
-                'payment_status'    => 'pending',
+                'payment_method' => $data['payment_method'],
+                'payment_status' => 'pending',
 
-                'notes'             => $data['notes'] ?? null,
+                'notes' => $data['notes'] ?? null,
             ]);
 
             $subtotal = 0;
@@ -97,10 +96,10 @@ class OrderService
                         ->first();
 
                     if (! $variant) {
-                        throw new \App\Exceptions\CheckoutException("Невалиден вариант за продукт: {$product->name}", 422);
+                        throw new CheckoutException("Невалиден вариант за продукт: {$product->name}", 422);
                     }
                 } elseif ($product->variants()->exists()) {
-                    throw new \App\Exceptions\CheckoutException("Моля, изберете вариант за продукт: {$product->name}", 422);
+                    throw new CheckoutException("Моля, изберете вариант за продукт: {$product->name}", 422);
                 }
 
                 if ($variant) {
@@ -116,16 +115,16 @@ class OrderService
                     ? ($variant->sale_price ?? $variant->price)
                     : ($product->sale_price ?? $product->price);
                 $total = $price * $itemData['quantity'];
-                
+
                 $subtotal += $total;
 
                 $order->items()->create([
-                    'product_id'   => $itemData['product_id'],
+                    'product_id' => $itemData['product_id'],
                     'product_variant_id' => $variant?->id,
                     'product_name' => $productName,
-                    'price'        => $price,
-                    'quantity'     => $itemData['quantity'],
-                    'total'        => $total,
+                    'price' => $price,
+                    'quantity' => $itemData['quantity'],
+                    'total' => $total,
                 ]);
             }
 
@@ -154,20 +153,52 @@ class OrderService
 
     /**
      * Cancel an existing order. This method performs the following steps:
-         *  1. It starts a database transaction to ensure atomicity of the operation.
-         *  2. It updates the order's status to 'cancelled' in the database without triggering model events.
-         *  3. Finally, it completes the transaction, ensuring that the order cancellation is applied atomically to maintain data integrity.
-         *  
-         * Note: This method assumes that any necessary stock adjustments or other related operations are handled elsewhere,
-         *  as it only updates the order's status.
+     *  1. It starts a database transaction to ensure atomicity of the operation.
+     *  2. It updates the order's status to 'cancelled' in the database without triggering model events.
+     *  3. Finally, it completes the transaction, ensuring that the order cancellation is applied atomically to maintain data integrity.
+     *
+     * Note: This method assumes that any necessary stock adjustments or other related operations are handled elsewhere,
+     *  as it only updates the order's status.
      */
     public function cancel(Order $order): void
     {
-        DB::transaction(function () use ($order){
+        DB::transaction(function () use ($order) {
             $order->updateQuietly([
                 'status' => 'cancelled',
             ]);
         });
+    }
+
+    public function releaseReservedStock(Order $order): void
+    {
+        DB::transaction(function () use ($order): void {
+            $lockedOrder = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->releaseReservedStockForLockedOrder($lockedOrder);
+        });
+    }
+
+    public function releaseReservedStockForLockedOrder(Order $order): void
+    {
+        $order->loadMissing(['items.product', 'items.variant']);
+
+        if ($order->stock_released_at !== null) {
+            return;
+        }
+
+        foreach ($order->items as $item) {
+            if ($item->variant) {
+                $this->stockService->releaseVariant($item->variant, (int) $item->quantity);
+            } elseif ($item->product) {
+                $this->stockService->release($item->product, (int) $item->quantity);
+            }
+        }
+
+        $order->forceFill([
+            'stock_released_at' => now(),
+        ])->saveQuietly();
     }
 
     /**
@@ -180,16 +211,12 @@ class OrderService
      */
     public function deleteOrderWithItems(Order $order): void
     {
-          DB::transaction(function () use ($order) {
-            $order->loadMissing(['items.product', 'items.variant']);
+        DB::transaction(function () use ($order) {
+            $order = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            foreach ($order->items as $item) {
-                if ($item->variant) {
-                    $this->stockService->releaseVariant($item->variant, (int) $item->quantity);
-                } elseif ($item->product) {
-                    $this->stockService->release($item->product, (int) $item->quantity);
-                }
-            }
+            $this->releaseReservedStockForLockedOrder($order);
 
             $order->items()->delete();
             $order->delete();

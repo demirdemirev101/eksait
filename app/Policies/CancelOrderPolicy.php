@@ -17,6 +17,7 @@ class CancelOrderPolicy
         'created',
         'pending',
         'confirmed',
+        'cancelled',
     ];
 
     public function canCancelOrder(Order $order): bool
@@ -46,4 +47,3 @@ class CancelOrderPolicy
         return in_array($order->status, self::RETURN_REQUESTABLE_STATUSES, true);
     }
 }
-

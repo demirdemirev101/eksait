@@ -14,7 +14,9 @@ use Livewire\Attributes\On;
 class ShipmentsRelationManager extends RelationManager
 {
     protected static string $relationship = 'shipments';
+
     protected static ?string $title = 'Доставка';
+
     protected static ?string $recordTitleAttribute = 'tracking_number';
 
     #[On('orderUpdated')]
@@ -50,13 +52,13 @@ class ShipmentsRelationManager extends RelationManager
                     ->color('info'),
 
                 TextColumn::make('direction')
-                    ->label('ÐŸÐ¾ÑÐ¾ÐºÐ°')
+                    ->label('Посока')
                     ->badge()
                     ->colors([
                         'primary' => 'outbound',
                         'warning' => 'return',
                     ])
-                    ->formatStateUsing(fn ($state) => $state === 'return' ? 'Ð’Ñ€ÑŠÑ‰Ð°Ð½Ðµ' : 'Ð˜Ð·Ð¿Ñ€Ð°Ñ‰Ð°Ð½Ðµ'),
+                    ->formatStateUsing(fn ($state) => $state === 'return' ? 'Връщане' : 'Изпращане'),
 
                 TextColumn::make('tracking_number')
                     ->label('Номер за проследяване')
@@ -137,7 +139,7 @@ class ShipmentsRelationManager extends RelationManager
                     ->color('success')
                     ->url(fn ($record) => $record->label_url)
                     ->openUrlInNewTab()
-                    ->authorize(fn ($record) => !empty($record->label_url)
+                    ->authorize(fn ($record) => ! empty($record->label_url)
                     && $record->status !== 'cancelled'),
             ])
             ->emptyStateHeading('Няма доставки')
