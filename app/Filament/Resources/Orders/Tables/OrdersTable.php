@@ -11,14 +11,16 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Model;
 
 class OrdersTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->poll('5s')
+            ->extraAttributes([
+                'wire:poll.5s' => 'refreshOrdersTable',
+            ])
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('user_id')
@@ -139,7 +141,7 @@ class OrdersTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->authorize(fn (? \Illuminate\Database\Eloquent\Model $record) => $record
+                        ->authorize(fn (?Model $record) => $record
                             ? (($record->status === 'pending_review'
                                     || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid')))
                             : true)
