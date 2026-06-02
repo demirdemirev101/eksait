@@ -24,6 +24,15 @@ class EcontPayloadMapper
      */
     public function map(Shipment $shipment): array
     {
+        if (($shipment->direction ?? 'outbound') === 'return') {
+            return $this->mapReturnShipment($shipment);
+        }
+
+        return $this->mapOutboundShipment($shipment);
+    }
+
+    private function mapOutboundShipment(Shipment $shipment): array
+    {
         $order = $shipment->order;
 
         if (!$order) {
@@ -113,6 +122,75 @@ class EcontPayloadMapper
         if ($freeDelivery) {
             $payload['paymentSenderMethod'] = 'cash';
             unset($payload['paymentReceiverMethod']);
+        }
+
+        return $payload;
+    }
+
+    private function mapReturnShipment(Shipment $shipment): array
+    {
+        $order = $shipment->order;
+
+        if (! $order) {
+            throw new RuntimeException('Shipment has no related order.');
+        }
+
+        if (empty($order->customer_phone)) {
+            throw new RuntimeException('Missing customer phone for Econt return shipment.');
+        }
+
+        $phone = $this->formatPhone($order->customer_phone);
+
+        $payload = [
+            'senderClient' => [
+                'name' => $order->customer_name,
+                'phones' => [$phone],
+            ],
+            'receiverClient' => [
+                'name' => config('services.econt.sender.name'),
+                'phones' => [config('services.econt.sender.phone')],
+            ],
+            'shipmentType' => $this->resolveShipmentType($shipment),
+            'sizeUnder60cm' => $this->isSizeUnder60cm($shipment),
+            'weight' => round($shipment->weight, 3),
+            'packCount' => $shipment->pack_count ?? 1,
+            'shipmentDescription' => 'Return package',
+            'payAfterAccept' => false,
+            'payAfterTest' => false,
+            'paymentReceiverMethod' => 'cash',
+        ];
+
+        if ($shipment->delivery_type === 'address') {
+            $payload['senderAddress'] = $this->buildAddress($order);
+        } else {
+            if (empty($shipment->office_code)) {
+                throw new RuntimeException('Missing customer office code for Econt return shipment.');
+            }
+
+            $payload['senderOfficeCode'] = $shipment->office_code;
+        }
+
+        $receiverOfficeCode = config('services.econt.sender.office_code');
+        if (! empty($receiverOfficeCode)) {
+            $payload['receiverOfficeCode'] = $receiverOfficeCode;
+        } else {
+            $receiverAddress = $this->buildSenderAddress();
+
+            if (! $receiverAddress) {
+                throw new RuntimeException('Missing merchant address for Econt return shipment.');
+            }
+
+            $payload['receiverAddress'] = $receiverAddress;
+        }
+
+        if ($shipment->delivery_type !== 'apm' && $shipment->declared_value > 0) {
+            $payload['services']['declaredValueAmount'] = round($shipment->declared_value, 2);
+        }
+
+        if (! empty($order->customer_email)) {
+            $payload['services']['smsNotification'] = [
+                'toEmail' => $order->customer_email,
+            ];
         }
 
         return $payload;

@@ -16,13 +16,17 @@ class ShipmentTrackingMail extends Mailable
     public function build()
     {
         $shipment = Shipment::with('order')->find($this->shipmentId);
+        $isReturnShipment = ($shipment?->direction ?? 'outbound') === 'return';
 
         return $this
-            ->subject('Вашата поръчка е изпратена')
+            ->subject($isReturnShipment
+                ? 'Инструкции за връщане на поръчка #' . ($shipment?->order?->id ?? '')
+                : 'Вашата поръчка е изпратена')
             ->view('emails.shipment.tracking', [
                 'shipment' => $shipment,
                 'trackingNumber' => $shipment?->tracking_number,
                 'labelUrl' => $shipment?->label_url,
+                'isReturnShipment' => $isReturnShipment,
             ]);
     }
 }

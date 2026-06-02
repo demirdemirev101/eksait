@@ -7,12 +7,10 @@ use App\Models\Order;
 
 class ShipmentPollingPolicy
 {
-    // Statuses that indicate that shipment polling should stop, as the shipment is either delivered or the order is cancelled/returned.
-    private const SHIPMENT_POLL_STOP_STATUSES = [
-        OrderStatus::COMPLETED->value,
-        OrderStatus::CANCELLED->value,
-        OrderStatus::RETURN_REQUESTED->value,
-        OrderStatus::RETURNED->value,
+    private const TERMINAL_SHIPMENT_STATUSES = [
+        'delivered',
+        'cancelled',
+        'returned',
     ];
 
     /**
@@ -21,7 +19,18 @@ class ShipmentPollingPolicy
      */
     private function shouldStopShipmentPolling(Order $record): bool
     {
-        return in_array($record->status, self::SHIPMENT_POLL_STOP_STATUSES, true);
+        if ($record->status === OrderStatus::RETURN_REQUESTED->value) {
+            $record->loadMissing('returnShipment');
+
+            return ! $record->returnShipment
+                || in_array($record->returnShipment->status, self::TERMINAL_SHIPMENT_STATUSES, true);
+        }
+
+        return in_array($record->status, [
+            OrderStatus::COMPLETED->value,
+            OrderStatus::CANCELLED->value,
+            OrderStatus::RETURNED->value,
+        ], true);
     }
     
     /**
@@ -34,11 +43,19 @@ class ShipmentPollingPolicy
             return false;
         }
 
+        $record->loadMissing(['shipment', 'returnShipment']);
+
+        if ($record->status === OrderStatus::RETURN_REQUESTED->value) {
+            return $record->returnShipment !== null
+                && ! in_array($record->returnShipment->status, self::TERMINAL_SHIPMENT_STATUSES, true);
+        }
+
         if ($this->shouldStopShipmentPolling($record)) {
             return false;
         }
 
-        return ! empty($record->shipment?->carrier_shipment_id);
+        return $record->shipment !== null
+            && ! in_array($record->shipment->status, self::TERMINAL_SHIPMENT_STATUSES, true);
     }
 
 }

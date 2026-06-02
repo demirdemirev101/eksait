@@ -26,7 +26,7 @@ class ShipmentTrackingSyncService
      */
     public function syncShipmentTracking(Order $order): bool
     {
-        $order = $order->fresh(['shipment']);
+        $order = $order->fresh(['shipment', 'returnShipment']);
         
         if (! $order) {
             return false;
@@ -36,7 +36,7 @@ class ShipmentTrackingSyncService
             return false;
         }
 
-        $shipment = $order->shipment;
+        $shipment = $this->resolveTrackableShipment($order);
 
         if (! $shipment) {
             return  false;
@@ -84,6 +84,7 @@ class ShipmentTrackingSyncService
             $shortStatus = $status['shortDeliveryStatus'] ?? $status['shortDeliveryStatusEn'] ?? null;
             $shortStatusEn = $status['shortDeliveryStatusEn'] ?? null;
             $trackingEvents = $status['trackingEvents'] ?? [];
+            $isReturnShipment = ($shipment->direction ?? 'outbound') === 'return';
 
             $delivered = ! empty($status['deliveryTime'])
                 || in_array($shortStatus, ['Доставена', 'Delivered'], true);
@@ -141,25 +142,39 @@ class ShipmentTrackingSyncService
 
             $orderChanged = false;
 
-            if ($returnedToSender && $order->status !== OrderStatus::RETURNED->value) {
-                $order->update(['status' => OrderStatus::RETURNED->value]);
-                $orderChanged = true;
-            } elseif ($returningToSender && $order->status !== OrderStatus::RETURN_REQUESTED->value) {
-                $order->update(['status' => OrderStatus::RETURN_REQUESTED->value]);
-                $orderChanged = true;
-            } elseif ($cancelledByCarrier && $order->status !== OrderStatus::CANCELLED->value) {
-                $order->update(['status' => OrderStatus::CANCELLED->value]);
-                $orderChanged = true;
-            } elseif ($delivered && $order->status !== OrderStatus::COMPLETED->value) {
-                $order->update(['status' => OrderStatus::COMPLETED->value]);
-                $orderChanged = true;
-            } elseif (
-                $inTransit
-                && $order->status !== OrderStatus::SHIPPED->value
-                && $order->status !== OrderStatus::COMPLETED->value
-            ) {
-                $order->update(['status' => OrderStatus::SHIPPED->value]);
-                $orderChanged = true;
+            if ($isReturnShipment) {
+                if ($delivered && $order->status !== OrderStatus::RETURNED->value) {
+                    $order->update(['status' => OrderStatus::RETURNED->value]);
+                    $orderChanged = true;
+                } elseif (
+                    ($inTransit || $returningToSender || $returnedToSender)
+                    && $order->status !== OrderStatus::RETURN_REQUESTED->value
+                    && $order->status !== OrderStatus::RETURNED->value
+                ) {
+                    $order->update(['status' => OrderStatus::RETURN_REQUESTED->value]);
+                    $orderChanged = true;
+                }
+            } else {
+                if ($returnedToSender && $order->status !== OrderStatus::RETURNED->value) {
+                    $order->update(['status' => OrderStatus::RETURNED->value]);
+                    $orderChanged = true;
+                } elseif ($returningToSender && $order->status !== OrderStatus::RETURN_REQUESTED->value) {
+                    $order->update(['status' => OrderStatus::RETURN_REQUESTED->value]);
+                    $orderChanged = true;
+                } elseif ($cancelledByCarrier && $order->status !== OrderStatus::CANCELLED->value) {
+                    $order->update(['status' => OrderStatus::CANCELLED->value]);
+                    $orderChanged = true;
+                } elseif ($delivered && $order->status !== OrderStatus::COMPLETED->value) {
+                    $order->update(['status' => OrderStatus::COMPLETED->value]);
+                    $orderChanged = true;
+                } elseif (
+                    $inTransit
+                    && $order->status !== OrderStatus::SHIPPED->value
+                    && $order->status !== OrderStatus::COMPLETED->value
+                ) {
+                    $order->update(['status' => OrderStatus::SHIPPED->value]);
+                    $orderChanged = true;
+                }
             }
 
             return $shipmentChanged || $orderChanged;
@@ -172,5 +187,14 @@ class ShipmentTrackingSyncService
             ]);
             return false;
         }
+    }
+
+    private function resolveTrackableShipment(Order $order): ?\App\Models\Shipment
+    {
+        if ($order->status === OrderStatus::RETURN_REQUESTED->value && $order->returnShipment) {
+            return $order->returnShipment;
+        }
+
+        return $order->shipment;
     }
 }

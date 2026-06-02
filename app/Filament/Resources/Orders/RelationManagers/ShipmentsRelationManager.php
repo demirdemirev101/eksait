@@ -49,6 +49,15 @@ class ShipmentsRelationManager extends RelationManager
                     ->badge()
                     ->color('info'),
 
+                TextColumn::make('direction')
+                    ->label('ÐŸÐ¾ÑÐ¾ÐºÐ°')
+                    ->badge()
+                    ->colors([
+                        'primary' => 'outbound',
+                        'warning' => 'return',
+                    ])
+                    ->formatStateUsing(fn ($state) => $state === 'return' ? 'Ð’Ñ€ÑŠÑ‰Ð°Ð½Ðµ' : 'Ð˜Ð·Ð¿Ñ€Ð°Ñ‰Ð°Ð½Ðµ'),
+
                 TextColumn::make('tracking_number')
                     ->label('Номер за проследяване')
                     ->copyable()

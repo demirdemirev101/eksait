@@ -31,8 +31,36 @@ class EcontShippingService
     {
         $shipment = $this->buildShipment($order, $order->shipping_price);
 
-        return $order->shipment()->create([
+        return $order->shipments()->create([
             'carrier' => 'econt',
+            'direction' => 'outbound',
+            'weight' => $shipment->weight,
+            'width' => $shipment->width,
+            'height' => $shipment->height,
+            'length' => $shipment->length,
+            'pack_count' => $shipment->pack_count,
+            'delivery_type' => $shipment->delivery_type,
+            'office_code' => $shipment->office_code,
+            'declared_value' => $shipment->declared_value,
+            'cash_on_delivery' => $shipment->cash_on_delivery,
+            'shipping_price_estimated' => $shipment->shipping_price_estimated,
+            'status' => 'created',
+        ]);
+    }
+
+    public function createReturnShipmentRecord(Order $order): Shipment
+    {
+        $order->load(['returnShipment', 'shipment', 'items.product', 'items.variant']);
+
+        if ($order->returnShipment && ! in_array($order->returnShipment->status, ['cancelled', 'error'], true)) {
+            throw new RuntimeException('A return shipment already exists for this order.');
+        }
+
+        $shipment = $this->buildReturnShipment($order);
+
+        return $order->shipments()->create([
+            'carrier' => 'econt',
+            'direction' => 'return',
             'weight' => $shipment->weight,
             'width' => $shipment->width,
             'height' => $shipment->height,
@@ -89,6 +117,33 @@ class EcontShippingService
             ? (float) ($order->subtotal ?? 0)
             : 0.0;
         $shipment->shipping_price_estimated = $estimatedShippingPrice;
+
+        return $shipment;
+    }
+
+    private function buildReturnShipment(Order $order): Shipment
+    {
+        $order->loadMissing(['items.product', 'items.variant', 'shipment']);
+
+        $sourceShipment = $order->shipment;
+        $deliveryType = $sourceShipment?->delivery_type ?? $this->resolveDeliveryType($order);
+        $shipment = new Shipment();
+        $shipment->setRelation('order', $order);
+        $shipment->direction = 'return';
+        $shipment->weight = (float) ($sourceShipment?->weight ?? $this->weightCalculator->forOrder($order));
+        $shipment->width = $sourceShipment?->width ?? $this->weightCalculator->maxDimension($order, 'width');
+        $shipment->height = $sourceShipment?->height ?? $this->weightCalculator->maxDimension($order, 'height');
+        $shipment->length = $sourceShipment?->length ?? $this->weightCalculator->maxDimension($order, 'length');
+        $shipment->pack_count = max(1, (int) ($sourceShipment?->pack_count ?? $this->calculatePackCount($order)));
+        $shipment->delivery_type = $deliveryType;
+        $shipment->office_code = $deliveryType !== 'address'
+            ? ($sourceShipment?->office_code ?? $order->econt_office_code)
+            : null;
+        $shipment->declared_value = $deliveryType === 'apm'
+            ? 0.0
+            : (float) ($sourceShipment?->declared_value ?? $order->subtotal ?? 0);
+        $shipment->cash_on_delivery = 0.0;
+        $shipment->shipping_price_estimated = null;
 
         return $shipment;
     }

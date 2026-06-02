@@ -95,7 +95,16 @@ class Order extends Model
      */
     public function shipment(): HasOne
     {
-        return $this->hasOne(Shipment::class);
+        return $this->hasOne(Shipment::class)
+            ->where('direction', 'outbound')
+            ->oldestOfMany();
+    }
+
+    public function returnShipment(): HasOne
+    {
+        return $this->hasOne(Shipment::class)
+            ->where('direction', 'return')
+            ->latestOfMany();
     }
 
     /**
