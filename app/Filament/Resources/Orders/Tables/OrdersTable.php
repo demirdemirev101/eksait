@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Services\OrderService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -131,6 +132,7 @@ class OrdersTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make()
+                    ->action(fn ($record) => app(OrderService::class)->deleteOrderWithItems($record))
                     ->visible(fn ($record) => $record->status === OrderStatus::CANCELLED->value),
             ])
             ->toolbarActions([
@@ -139,7 +141,12 @@ class OrdersTable
                         ->authorize(fn (? \Illuminate\Database\Eloquent\Model $record) => $record
                             ? (($record->status === 'pending_review'
                                     || ($record->payment_method === 'bank_transfer' && $record->payment_status !== 'paid')))
-                            : true),
+                            : true)
+                        ->action(function ($records): void {
+                            $orderService = app(OrderService::class);
+
+                            $records->each(fn ($record) => $orderService->deleteOrderWithItems($record));
+                        }),
                 ]),
             ]);
     }
