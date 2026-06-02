@@ -9,6 +9,10 @@ use RuntimeException;
 
 class EcontPayloadMapper
 {
+    public function __construct(
+        private EcontCityResolverService $cityResolver,
+    ) {}
+
     /**
      * Maps a Shipment model to the payload structure required by the Econt API for creating a shipment.
      * The method performs several key functions:
@@ -17,10 +21,12 @@ class EcontPayloadMapper
      * 3. Builds the payload with sender and receiver information, shipment details, and optional services based on the shipment and order data.
      * 4. Handles both address and office delivery types, constructing the appropriate payload fields for each case.
      * 5. Determines if free delivery applies based on the order subtotal and global settings, adjusting the payment method accordingly.
-     * @param Shipment $shipment The shipment instance to be mapped to the Econt API payload.
+     *
+     * @param  Shipment  $shipment  The shipment instance to be mapped to the Econt API payload.
      * @return array The structured payload ready to be sent to the Econt API for shipment creation.
+     *
      * @throws RuntimeException If critical data is missing from the shipment or related order,
-     * or if the payload cannot be constructed due to incomplete address information.
+     *                          or if the payload cannot be constructed due to incomplete address information.
      */
     public function map(Shipment $shipment): array
     {
@@ -35,7 +41,7 @@ class EcontPayloadMapper
     {
         $order = $shipment->order;
 
-        if (!$order) {
+        if (! $order) {
             throw new RuntimeException('Shipment has no related order.');
         }
 
@@ -67,8 +73,8 @@ class EcontPayloadMapper
 
         ];
 
-        $senderOfficeCode = config('services.econt.sender.office_code');
-        if (!empty($senderOfficeCode)) {
+        $senderOfficeCode = $this->resolveConfiguredSenderOfficeCode();
+        if (! empty($senderOfficeCode)) {
             $payload['senderOfficeCode'] = $senderOfficeCode;
         } else {
             $senderAddress = $this->buildSenderAddress();
@@ -100,13 +106,13 @@ class EcontPayloadMapper
         if ($shipment->delivery_type !== 'apm') {
             if ($shipment->declared_value > 0) {
                 $payload['services']['declaredValueAmount'] = round($shipment->declared_value, 2);
-            } elseif (!empty($order->subtotal) && $order->subtotal > 0) {
+            } elseif (! empty($order->subtotal) && $order->subtotal > 0) {
                 $payload['services']['declaredValueAmount'] = round($order->subtotal, 2);
             }
         }
 
         // SMS notification (optional) - only include if customer email is available for notification
-        if (!empty($order->customer_email)) {
+        if (! empty($order->customer_email)) {
             $payload['services']['smsNotification'] = [
                 'toEmail' => $order->customer_email,
             ];
@@ -170,7 +176,7 @@ class EcontPayloadMapper
             $payload['senderOfficeCode'] = $shipment->office_code;
         }
 
-        $receiverOfficeCode = config('services.econt.sender.office_code');
+        $receiverOfficeCode = $this->resolveConfiguredSenderOfficeCode();
         if (! empty($receiverOfficeCode)) {
             $payload['receiverOfficeCode'] = $receiverOfficeCode;
         } else {
@@ -232,33 +238,36 @@ class EcontPayloadMapper
 
         return $width < $limit && $height < $limit && $length < $limit;
     }
+
     /**
      * Formats a phone number to ensure it is in the correct format for Econt API. The method performs the following steps:
      * 1. Removes any spaces, dashes, parentheses, or other common formatting characters from the input phone number.
-     * 2. Checks if the phone number starts with a '+' character. If it does not, it assumes the number is a local Bulgarian number 
+     * 2. Checks if the phone number starts with a '+' character. If it does not, it assumes the number is a local Bulgarian number
      * and prepends the +359 country code. If the number starts with '0', it removes the leading '0' before adding the country code.
-     * 3. Returns the formatted phone number as a string, ensuring it is in the correct international format required by the Econt API. 
+     * 3. Returns the formatted phone number as a string, ensuring it is in the correct international format required by the Econt API.
      * This method helps to standardize phone numbers and reduce the likelihood of errors when sending data to the Econt API for shipment creation.
-     * @param string $phone The input phone number to be formatted.
+     *
+     * @param  string  $phone  The input phone number to be formatted.
      * @return string The formatted phone number in international format suitable for Econt API.
      */
     private function formatPhone(string $phone): string
     {
         $phone = preg_replace('/[\s\-\(\)]+/', '', $phone);
 
-        if (!str_starts_with($phone, '+')) {
+        if (! str_starts_with($phone, '+')) {
             if (str_starts_with($phone, '0')) {
-                $phone = '+359' . substr($phone, 1);
+                $phone = '+359'.substr($phone, 1);
             } else {
-                $phone = '+359' . $phone;
+                $phone = '+359'.$phone;
             }
         }
 
         return $phone;
     }
+
     /**
      * Builds the receiver address payload for Econt API based on the order's shipping information. The method performs the following steps:
-     * 1. Normalizes the input data by trimming whitespace from the city name, post code, and street address. 
+     * 1. Normalizes the input data by trimming whitespace from the city name, post code, and street address.
      * It also checks for the presence of critical fields (city, post code, street) and logs an error and throws an exception if any of these fields are missing.
      * 2. Constructs the address payload with the required structure for Econt API, including country code, city name, post code, and street address.
      * 3. Optionally includes additional address details such as building number, quarter, and other address details if they are available in the order data.
@@ -268,9 +277,8 @@ class EcontPayloadMapper
      */
     private function buildAddress(object $order): array
     {
-        //Removing the extra spaces and normalizing the city name, post code, and street address
+        // Removing the extra spaces and normalizing the city name, post code, and street address
         $cityName = trim($order->shipping_city);
-
 
         $postCode = trim((string) ($order->shipping_postcode ?? ''));
         $street = trim($order->shipping_address ?? '');
@@ -299,17 +307,17 @@ class EcontPayloadMapper
         ];
 
         // Optionally include building number, quarter, and other address details if available
-        if (!empty($order->shipping_address_num)) {
+        if (! empty($order->shipping_address_num)) {
             $address['num'] = trim((string) $order->shipping_address_num);
         }
 
-        if (!empty($order->shipping_address_quarter)) {
+        if (! empty($order->shipping_address_quarter)) {
             $address['quarter'] = trim((string) $order->shipping_address_quarter);
-        } elseif (!empty($order->shipping_quarter)) {
+        } elseif (! empty($order->shipping_quarter)) {
             $address['quarter'] = trim((string) $order->shipping_quarter);
         }
 
-        if (!empty($order->shipping_address_details)) {
+        if (! empty($order->shipping_address_details)) {
             $address['other'] = trim((string) $order->shipping_address_details);
         }
 
@@ -322,6 +330,7 @@ class EcontPayloadMapper
 
         return $address;
     }
+
     /**
      * Builds the sender address payload for Econt API based on the configured sender information. The method performs the following steps:
      * 1. Retrieves the sender city, post code, and street from the application configuration and trims any extra whitespace from these values.
@@ -329,9 +338,10 @@ class EcontPayloadMapper
      *  indicating that the sender address cannot be constructed.
      * 3. Constructs the sender address payload with the required structure for Econt API, including country code, city name, post code, and street address.
      *  It also optionally includes the building number if it is available in the configuration.
-     * 4. Returns the structured sender address array ready to be included in the Econt API shipment creation payload. 
+     * 4. Returns the structured sender address array ready to be included in the Econt API shipment creation payload.
      *  This method ensures that the sender address is properly formatted and contains all necessary information for Econt API compatibility,
      *  while also providing a fallback mechanism if the sender address cannot be constructed due to missing configuration values.
+     *
      * @return array|null The structured sender address array for Econt API, or null if critical fields are missing from the configuration.
      */
     private function buildSenderAddress(): ?array
@@ -365,14 +375,47 @@ class EcontPayloadMapper
         return $address;
     }
 
+    private function resolveConfiguredSenderOfficeCode(): ?string
+    {
+        $officeValue = trim((string) config('services.econt.sender.office_code'));
+
+        if ($officeValue === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d+$/', $officeValue) === 1) {
+            return $officeValue;
+        }
+
+        $cityName = trim((string) config('services.econt.sender.city'));
+
+        if ($cityName === '') {
+            throw new RuntimeException('Missing merchant city for Econt sender office lookup.');
+        }
+
+        $office = $this->cityResolver->getOfficeByName($cityName, $officeValue);
+        $officeCode = trim((string) ($office['code'] ?? $office['officeCode'] ?? $office['office_code'] ?? ''));
+
+        if ($officeCode === '') {
+            throw new RuntimeException(sprintf(
+                'Could not resolve Econt sender office "%s" in city "%s".',
+                $officeValue,
+                $cityName,
+            ));
+        }
+
+        return $officeCode;
+    }
+
     /**
      * Determines the holiday delivery day for a given order based on the presence of the holiday_delivery_day field. The method performs the following steps:
      * 1. Checks if the order has a non-empty holiday_delivery_day field. If it does, the method returns this value formatted as a date string (Y-m-d) if it
-     * is an instance of DateTimeInterface, or as a string if it is already in a string format. 
+     * is an instance of DateTimeInterface, or as a string if it is already in a string format.
      * This allows for flexibility in how the holiday delivery day can be specified in the order data.
      * 2. If the holiday_delivery_day field is empty, the method returns the string 'workday', indicating that the delivery should be scheduled for the next available workday.
      * This method provides a way to specify special delivery days for orders, such as holidays, while also providing a default behavior for regular deliveries. The returned value can then be included in the E
-     * @param object $order The order object containing the holiday_delivery_day field and other relevant information for determining the delivery day.
+     *
+     * @param  object  $order  The order object containing the holiday_delivery_day field and other relevant information for determining the delivery day.
      * @return string The determined holiday delivery day formatted as a date string (Y-m-d) for use in the Econt API shipment creation payload.
      */
     private function resolveHolidayDeliveryDay(): string

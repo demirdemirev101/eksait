@@ -23,7 +23,7 @@ class EcontCityResolverService
         $normalizedName = $this->normalizeCityName($cityName);
         $normalizedPostCode = $postCode ? trim($postCode) : null;
 
-        $cacheKey = 'econt_city_' . md5($normalizedName . '_' . $normalizedPostCode);
+        $cacheKey = 'econt_city_'.md5($normalizedName.'_'.$normalizedPostCode);
 
         return Cache::remember($cacheKey, now()->addDays(30), function () use ($cityName, $normalizedName, $normalizedPostCode) {
             $cities = $this->econtService->getCities($cityName);
@@ -86,7 +86,7 @@ class EcontCityResolverService
             return [];
         }
 
-        $cacheKey = 'econt_offices_city_' . md5($normalizedCityName);
+        $cacheKey = 'econt_offices_city_'.md5($normalizedCityName);
 
         return Cache::remember($cacheKey, now()->addDays(7), function () use ($cityName, $normalizedCityName) {
             try {
@@ -142,6 +142,34 @@ class EcontCityResolverService
         return null;
     }
 
+    public function getOfficeByName(string $cityName, string $officeName): ?array
+    {
+        $normalizedCityName = $this->normalizeCityName($cityName);
+        $normalizedOfficeName = $this->normalizeOfficeName($officeName);
+
+        if ($normalizedCityName === '' || $normalizedOfficeName === '') {
+            return null;
+        }
+
+        $matches = [];
+
+        foreach ($this->getOffices($cityName) as $office) {
+            if (! is_array($office)) {
+                continue;
+            }
+
+            if ($this->officeMatchesName($office, $normalizedOfficeName, $normalizedCityName)) {
+                $matches[] = $office;
+            }
+        }
+
+        if (count($matches) === 1) {
+            return $matches[0];
+        }
+
+        return null;
+    }
+
     private function officeMatchesCity(array $office, string $normalizedCityName): bool
     {
         $candidates = [
@@ -164,6 +192,35 @@ class EcontCityResolverService
         return false;
     }
 
+    private function officeMatchesName(array $office, string $normalizedOfficeName, string $normalizedCityName): bool
+    {
+        $candidates = [
+            $office['name'] ?? null,
+            $office['nameEn'] ?? null,
+            $office['officeName'] ?? null,
+            data_get($office, 'address.fullAddress'),
+            data_get($office, 'address.street'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            $normalizedCandidate = $this->normalizeOfficeName($candidate, $normalizedCityName);
+
+            if ($normalizedCandidate === $normalizedOfficeName) {
+                return true;
+            }
+
+            if (str_contains($normalizedCandidate, $normalizedOfficeName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function normalizeCityName(?string $cityName): string
     {
         $normalized = mb_strtolower(trim((string) $cityName));
@@ -171,5 +228,19 @@ class EcontCityResolverService
         $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
 
         return $normalized;
+    }
+
+    private function normalizeOfficeName(?string $officeName, ?string $normalizedCityName = null): string
+    {
+        $normalized = mb_strtolower(trim((string) $officeName));
+        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
+
+        $normalizedCityName ??= '';
+
+        if ($normalizedCityName !== '' && str_starts_with($normalized, $normalizedCityName.' ')) {
+            $normalized = mb_substr($normalized, mb_strlen($normalizedCityName.' '));
+        }
+
+        return trim($normalized);
     }
 }

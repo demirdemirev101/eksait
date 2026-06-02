@@ -8,6 +8,7 @@ Eksait is a Laravel e-commerce backend with a JSON API, Filament admin panel, ca
 - Guest and authenticated carts with session-based cart recovery and merge-on-login behavior.
 - Checkout flow with bank transfer, cash on delivery, and optional Stripe payment sessions.
 - Econt shipping support for address, office, and automatic post station delivery.
+- Stripe-aware order cancellation and return flows in Filament, including Econt label deletion and refund handling.
 - Order, shipment, settings, product, category, banner, message, user, and sales management through Filament.
 - Shipment creation, tracking emails, order confirmation emails, and admin notifications through queued jobs and listeners.
 - Public API endpoints for products, cart, checkout, authentication, contact messages, orders, and home banners.
@@ -125,12 +126,27 @@ SEED_ADMIN_PHONE=
 
 Set `FRONTEND_URL` to the URL of the React or storefront client that consumes this API. Stripe checkout success and cancel URLs are built from this value.
 
+For Econt sender configuration:
+
+- Use `ECONT_SENDER_OFFICE` for office-based sending.
+- `ECONT_SENDER_OFFICE` may be either an office code like `9707` or an office name like `Осми март`.
+- If you use an office name, keep `ECONT_SENDER_CITY` set so the office can be resolved correctly.
+- If `ECONT_SENDER_OFFICE` is set, sender address fields are ignored for outbound shipments and return shipments back to the store.
+- If you use sender address mode instead, leave `ECONT_SENDER_OFFICE` empty and fill `ECONT_SENDER_CITY`, `ECONT_SENDER_POSTCODE`, `ECONT_SENDER_STREET`, and `ECONT_SENDER_NUM`.
+
 Use one of these values for `ECONT_BASE_URL` depending on the environment:
 
 - `https://demo.econt.com/ee/services` for sandbox testing
 - `https://ee.econt.com/services` for production credentials
 
 `php artisan test:econt-api` reads `ECONT_BASE_URL`, `ECONT_VERIFY_SSL`, `ECONT_USERNAME`, and `ECONT_PASSWORD` through `config/services.php`. It does not print the configured username or password.
+
+After changing Econt-related `.env` values, clear cached configuration and restart queue workers:
+
+```bash
+php artisan optimize:clear
+php artisan queue:restart
+```
 
 ## Running Locally
 
@@ -144,7 +160,7 @@ Or run them separately:
 
 ```bash
 php artisan serve
-php artisan queue:listen --tries=1
+php artisan queue:work
 npm run dev
 ```
 
@@ -240,6 +256,12 @@ Frontend guidance:
 6. If the selected payment method is `stripe`, redirect the customer to the returned `checkout_url`.
 7. Stripe webhook updates the order payment state after payment events.
 
+Admin-side order handling:
+
+- Stripe cancellations before shipment can delete the Econt label, refund the remaining paid amount, and cancel the order in one flow.
+- Stripe orders that are already shipped, in transit, or delivered should go through a return request flow instead of direct cancellation.
+- When a Stripe return request is created, the system creates a return shipment and refunds the remaining amount while keeping the order in a return state until the return shipment is completed.
+
 ## Admin Panel
 
 Filament resources are available for:
@@ -254,6 +276,8 @@ Filament resources are available for:
 - Users
 
 Admin access is protected by application middleware and permissions. Create or promote an admin user according to your deployment process before exposing the panel.
+
+For local setup, the seeder can create an admin when `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are present in `.env`.
 
 ## Background Jobs and Events
 
