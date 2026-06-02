@@ -17,11 +17,11 @@ use App\Services\Econt\EcontCityResolverService;
 use App\Services\OrderService;
 use App\Services\SettingsService;
 use App\Services\StripeCheckoutService;
+use App\Support\CartSessionToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
 
 class CheckoutController extends Controller
 {
@@ -68,25 +68,7 @@ class CheckoutController extends Controller
 
     private function frontendCartSessionId(Request $request): ?string
     {
-        $sessionId = $request->input('session_id')
-            ?? $request->input('sessionId')
-            ?? $request->query('session_id')
-            ?? $request->query('sessionId')
-            ?? $request->header('X-Cart-Session-Id');
-
-        if (! is_scalar($sessionId)) {
-            return null;
-        }
-
-        $sessionId = trim((string) $sessionId);
-
-        if ($sessionId === '') {
-            return null;
-        }
-
-        Session::put('cart_session_id', $sessionId);
-
-        return $sessionId;
+        return CartSessionToken::fromRequest($request, generateWhenMissing: true);
     }
 
     /**

@@ -15,7 +15,8 @@ class TestEcontMinimal extends Command
                             {--calculate : Calculate only, no label}
                             {--address : Use senderAddress instead of office}
                             {--office= : Receiver office code (e.g. 1127)}
-                            {--mode= : create or validate}';
+                            {--mode= : create or validate}
+                            {--dump : Print raw payload and response data}';
 
     protected $description = 'Minimal Econt shipment test (no DB, no events)';
 
@@ -84,7 +85,11 @@ class TestEcontMinimal extends Command
         }
 
         $this->info('📦 Final payload:');
-        dump($payload);
+        if ($this->option('dump')) {
+            dump($payload);
+        } else {
+            $this->info('Use --dump to print raw payload data.');
+        }
 
         // 5️⃣ Call Econt
         $econt = app(EcontService::class);
@@ -98,7 +103,11 @@ class TestEcontMinimal extends Command
                 $mode = $this->option('mode') ?: 'create';
                 $this->info('📦 CREATE LABEL MODE: ' . $mode);
                 $response = $econt->createLabel($payload, $mode);
-                dump($response);
+                if ($this->option('dump')) {
+                    dump($response);
+                } else {
+                    $this->info('Econt response received. Use --dump to print raw response data.');
+                }
             }
         } catch (\Throwable $e) {
             $this->error('❌ Econt API ERROR');

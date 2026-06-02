@@ -83,7 +83,7 @@ FRONTEND_URL=http://localhost:5173
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=eksait
+DB_DATABASE=freshwater
 DB_USERNAME=root
 DB_PASSWORD=
 
@@ -103,7 +103,7 @@ ECONT_MAX_PACK_WEIGHT_KG=30
 ECONT_CARGO_DIMENSION_FROM_CM=60
 ECONT_USERNAME=
 ECONT_PASSWORD=
-ECONT_SENDER_NAME=
+ECONT_SENDER_NAME="Eksait"
 ECONT_SENDER_PHONE=
 ECONT_SENDER_OFFICE=
 ECONT_SENDER_CITY=
@@ -116,6 +116,11 @@ BANK_TRANSFER_IBAN=
 BANK_TRANSFER_BANK=
 BANK_TRANSFER_BIC=
 BANK_TRANSFER_CURRENCY=EUR
+
+SEED_ADMIN_EMAIL=
+SEED_ADMIN_PASSWORD=
+SEED_ADMIN_NAME=
+SEED_ADMIN_PHONE=
 ```
 
 Set `FRONTEND_URL` to the URL of the React or storefront client that consumes this API. Stripe checkout success and cancel URLs are built from this value.
@@ -157,6 +162,13 @@ Run Laravel Pint formatting:
 
 ```bash
 ./vendor/bin/pint
+```
+
+Check dependencies for known advisories:
+
+```bash
+composer audit
+npm audit
 ```
 
 ## API Overview
@@ -205,6 +217,18 @@ For guest cart continuity, send the same session id in one of these places:
 - `session_id` query parameter
 - `sessionId` query parameter
 - `X-Cart-Session-Id` header
+
+Treat guest cart session ids as bearer identifiers. The value must be 16-128 characters and contain only letters, numbers, underscores, or dashes.
+
+Frontend guidance:
+
+- Prefer `crypto.randomUUID()` or a cryptographically random token.
+- Persist the value in local storage or equivalent guest-cart state.
+- If the frontend does not have a session id yet, call `GET /api/cart`; the response includes a generated `session_id`.
+- Send the same value on all guest cart, checkout, login, and register requests until the user authenticates.
+- Invalid session ids return `422` validation errors.
+- Cart endpoints are rate-limited and may return `429` when abused.
+- Checkout and Econt lookup endpoints are rate-limited separately and may also return `429`.
 
 ## Checkout Flow
 
@@ -267,6 +291,8 @@ php artisan test:econt-api
 php artisan test:econt-minimal
 ```
 
+`test:econt-minimal` is a diagnostic command. Depending on options and credentials it can call the Econt API. Use `--dump` only when you intentionally need raw payload/response data, and avoid running it with production credentials unless you are testing a real integration path.
+
 ## Project Structure
 
 ```text
@@ -284,10 +310,35 @@ routes/api.php           JSON API routes
 tests/Feature            Feature tests
 ```
 
+## Production Checklist
+
+- Set `APP_ENV=production` and `APP_DEBUG=false`.
+- Use a real `APP_KEY`; never share or rotate it casually after encrypted data exists.
+- Configure production `APP_URL`, `FRONTEND_URL`, mail, Stripe, Econt, and bank transfer values through environment secrets.
+- Run `composer install --no-dev --optimize-autoloader`.
+- Run `npm run build`.
+- Run `php artisan migrate --force`.
+- Cache framework metadata after configuration is final:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+- Run a queue worker or supervisor for queued mail, shipping, and notification jobs.
+- Run `composer audit` and `npm audit` before deployment.
+- Do not seed production with demo users. To create an admin through the seeder, set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`.
+
 ## Security Notes
 
 - Do not commit real Stripe, Econt, bank, mail, or production database credentials.
 - Keep `.env.example` as a safe template only. Store real values in `.env` or your deployment secret manager.
+- Keep `APP_DEBUG=false` in production.
+- Review `DatabaseSeeder` before using `php artisan migrate:fresh --seed`; demo users are only created outside production unless explicit seed admin credentials are provided.
+- Guest cart `session_id` values should be random and treated as sensitive because they identify a guest cart.
+- Public checkout, cart, and Econt lookup endpoints are rate-limited; tune the limits in `AppServiceProvider` for the deployment environment.
+- Keep Composer and npm dependencies updated when `composer audit` or `npm audit` reports advisories.
 
 ## License
 

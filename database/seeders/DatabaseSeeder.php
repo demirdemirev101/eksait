@@ -25,25 +25,40 @@ class DatabaseSeeder extends Seeder
         | Users
         |--------------------------------------------------------------------------
         */
-        $admin = User::firstOrCreate(
-            ['email' => 'demir@abv.bg'],
-            [
-                'name' => 'Demir Demirev',
-                'phone' => '0888123456',
-                'password' => Hash::make('password'),
-            ]
-        );
-        $admin->syncRoles(['admin']);
+        $adminEmail = env('SEED_ADMIN_EMAIL');
+        $adminPassword = env('SEED_ADMIN_PASSWORD');
 
-        $customer = User::firstOrCreate(
-            ['email' => 'customer@example.com'],
-            [
-                'name' => 'John Doe',
-                'phone' => '0888123456',
-                'password' => Hash::make('password'),
-            ]
-        );
-        $customer->syncRoles(['customer']);
+        if ($adminEmail && $adminPassword) {
+            $admin = User::firstOrCreate(
+                ['email' => $adminEmail],
+                [
+                    'name' => env('SEED_ADMIN_NAME', 'Admin'),
+                    'phone' => env('SEED_ADMIN_PHONE', null),
+                    'password' => Hash::make($adminPassword),
+                ]
+            );
+            $admin->syncRoles(['admin']);
+        } elseif (! app()->environment('production')) {
+            $admin = User::firstOrCreate(
+                ['email' => 'demir@abv.bg'],
+                [
+                    'name' => 'Demir Demirev',
+                    'phone' => '0888123456',
+                    'password' => Hash::make('password'),
+                ]
+            );
+            $admin->syncRoles(['admin']);
+
+            $customer = User::firstOrCreate(
+                ['email' => 'customer@example.com'],
+                [
+                    'name' => 'John Doe',
+                    'phone' => '0888123456',
+                    'password' => Hash::make('password'),
+                ]
+            );
+            $customer->syncRoles(['customer']);
+        }
 
         /*
         |--------------------------------------------------------------------------

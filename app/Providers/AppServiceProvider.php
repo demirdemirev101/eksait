@@ -34,6 +34,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->ip());
         });
 
+        RateLimiter::for('cart', function (Request $request): Limit {
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('checkout', function (Request $request): Limit {
+            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('auth', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }

@@ -19,7 +19,8 @@ trait HasCheckoutShippingRules
             'econt_office_address' => 'nullable|string',
             'econt_office_is_aps' => 'nullable|boolean',
             'payment_method' => 'nullable|string',
-            'session_id' => 'sometimes|string',
+            'session_id' => ['sometimes', 'string', 'min:16', 'max:128', 'regex:/\A[A-Za-z0-9_-]+\z/'],
+            'sessionId' => ['sometimes', 'string', 'min:16', 'max:128', 'regex:/\A[A-Za-z0-9_-]+\z/'],
         ];
     }
 }

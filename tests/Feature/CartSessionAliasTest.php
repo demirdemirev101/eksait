@@ -10,6 +10,37 @@ class CartSessionAliasTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_cart_endpoint_generates_secure_session_id_when_missing(): void
+    {
+        $response = $this->getJson('/api/cart')
+            ->assertOk();
+
+        $sessionId = $response->json('session_id');
+
+        $this->assertIsString($sessionId);
+        $this->assertMatchesRegularExpression('/\A[A-Za-z0-9_-]{16,128}\z/', $sessionId);
+
+        $this->assertDatabaseHas('carts', [
+            'session_id' => $sessionId,
+        ]);
+    }
+
+    public function test_cart_endpoint_rejects_invalid_session_id(): void
+    {
+        $product = Product::create([
+            'name' => 'Invalid Session Product',
+            'price' => 12.50,
+            'sale_price' => null,
+            'quantity' => 50,
+            'stock' => true,
+        ]);
+
+        $this->postJson("/api/cart/add/{$product->id}?session_id=short", [
+            'quantity' => 1,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('session_id');
+    }
+
     public function test_cart_endpoints_accept_camel_case_session_id(): void
     {
         $product = Product::create([

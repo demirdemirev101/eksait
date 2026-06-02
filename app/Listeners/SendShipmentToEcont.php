@@ -55,7 +55,7 @@ class SendShipmentToEcont implements ShouldQueue
                 'shipment_id' => $shipment->id,
             ]);
 
-            dispatch(new SendTrackingEmailJob($order->id));
+            dispatch(new SendTrackingEmailJob($shipment->id));
 
             return;
         }

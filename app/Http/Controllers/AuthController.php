@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\CartService;
+use App\Support\CartSessionToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -18,27 +18,7 @@ class AuthController extends Controller
 {
     private function cartSessionId(Request $request): ?string
     {
-        $sessionId = $request->input('session_id')
-            ?? $request->input('sessionId')
-            ?? $request->query('session_id')
-            ?? $request->query('sessionId')
-            ?? $request->header('X-Cart-Session-Id');
-
-        if (is_scalar($sessionId)) {
-            $sessionId = trim((string) $sessionId);
-
-            if ($sessionId !== '') {
-                Session::put('cart_session_id', $sessionId);
-
-                return $sessionId;
-            }
-        }
-
-        $rememberedSessionId = Session::get('cart_session_id');
-
-        return is_string($rememberedSessionId) && trim($rememberedSessionId) !== ''
-            ? trim($rememberedSessionId)
-            : null;
+        return CartSessionToken::fromRequest($request);
     }
 
     public function login(Request $request): JsonResponse
