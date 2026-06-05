@@ -80,4 +80,76 @@ class ProductApiController extends Controller
 
         return ProductAPIResource::collection($products)->response();
     }
+
+    public function equipment()
+    {
+        $products = Product::with([
+            'categories:id,name,slug',
+            'images:id,product_id,image_path,is_primary,sort_order',
+            'variants:id,product_id,size,price,sale_price,stock,quantity',
+            'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
+            'relatedProducts.categories:id,name,slug',
+            'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
+            'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
+        ])
+        ->whereHas('categories', function ($categoryQuery) {
+            $categoryQuery->where('slug', 'equipment');
+        })
+        ->get();
+
+        return ProductAPIResource::collection($products);
+    }
+
+    public function equipmentSearch(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+        $limit = max(1, min((int) $request->query('limit', 10), 50));
+
+        if ($query === '') {
+            return response()->json(['data' => []]);
+        }
+
+        $normalized = mb_strtolower($query);
+        $slugQuery = Str::slug($query);
+
+        $products = Product::query()
+            ->with([
+                'categories:id,name,slug',
+                'images:id,product_id,image_path,is_primary,sort_order',
+                'variants:id,product_id,size,price,sale_price,stock,quantity',
+                'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
+                'relatedProducts.categories:id,name,slug',
+                'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
+                'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
+            ])
+            ->whereHas('categories', function ($categoryQuery) {
+                $categoryQuery->where('slug', 'equipment');
+            })
+            ->where(function ($q) use ($normalized, $slugQuery) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(description) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(extra_information) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereHas('variants', function ($variantQuery) use ($normalized) {
+                        $variantQuery->whereRaw('LOWER(size) LIKE ?', ["%{$normalized}%"]);
+                    })
+                    ->orWhereHas('categories', function ($categoryQuery) use ($normalized, $slugQuery) {
+                        $categoryQuery
+                            ->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
+                            ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"]);
+
+                        if ($slugQuery !== '') {
+                            $categoryQuery->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
+                        }
+                    });
+
+                if ($slugQuery !== '') {
+                    $q->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
+                }
+            })
+            ->limit($limit)
+            ->get();
+
+        return ProductAPIResource::collection($products)->response();
+    }
 }

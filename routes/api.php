@@ -13,6 +13,8 @@ use App\Http\Controllers\OrdersController;
 
 Route::get('/products/search', [ProductApiController::class, 'search']);
 Route::get('/products', [ProductApiController::class, 'index']);
+Route::get('/equipment', [ProductApiController::class, 'equipment']);
+Route::get('/equipment/search', [ProductApiController::class, 'equipmentSearch']);
 Route::get('/home-banner', [HomeBannerController::class, 'show']);
 Route::get('/checkout/payment-methods', [CheckoutController::class, 'paymentMethods']);
 Route::post('/stripe/webhook', [StripeController::class, 'webhook']);
