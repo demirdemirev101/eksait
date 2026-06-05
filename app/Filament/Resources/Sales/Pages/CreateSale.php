@@ -151,9 +151,9 @@ class CreateSale extends CreateRecord
                     ->get()
                     ->keyBy('id');
                 $variants = ProductVariant::query()
-                    ->whereIn('id', $items->pluck('product_variant_id')->filter()->all())
+                    ->whereIn('id', $items->pluck('product_variant_id')->filter()->map(fn ($id) => (int) $id)->all())
                     ->get()
-                    ->keyBy('id');
+                    ->keyBy(fn (ProductVariant $variant) => (int) $variant->id);
 
                 $subtotal = 0.0;
 
@@ -266,7 +266,7 @@ class CreateSale extends CreateRecord
 
     private function variantForItem(Product $product, Collection $variants, mixed $variantId): ?ProductVariant
     {
-        if (empty($variantId)) {
+        if (blank($variantId)) {
             if ($product->variants->isNotEmpty()) {
                 throw new CheckoutException("Изберете вариант за {$product->name}.", 422);
             }
@@ -274,9 +274,13 @@ class CreateSale extends CreateRecord
             return null;
         }
 
-        $variant = $variants->get($variantId);
+        $variant = $variants->get((int) $variantId);
 
-        if (! $variant || $variant->product_id !== $product->id) {
+        if (! $variant) {
+            throw new CheckoutException("Невалиден вариант за {$product->name}.", 422);
+        }
+
+        if ((int) $variant->product_id !== (int) $product->id) {
             throw new CheckoutException("Невалиден вариант за {$product->name}.", 422);
         }
 
