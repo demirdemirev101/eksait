@@ -333,7 +333,6 @@ class CheckoutController extends Controller
     public function store(
         CheckoutRequest $request,
         OrderService $orderService,
-        StripeCheckoutService $stripeCheckoutService,
         EcontCityResolverService $econtCityResolverService
     ) 
     {
@@ -344,6 +343,7 @@ class CheckoutController extends Controller
             $order = $orderService->createFromItems($validated);
 
             if ($order->payment_method === 'stripe') {
+                $stripeCheckoutService = app(StripeCheckoutService::class);
                 $session = $stripeCheckoutService->createSession($order, $validated['session_id'] ?? null);
                 $order->updateQuietly([
                     'stripe_checkout_session_id' => $session->id,

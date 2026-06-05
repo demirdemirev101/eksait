@@ -44,7 +44,7 @@ class ShipmentsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->poll(fn (): ?string => $this->shouldPollForStripeShipment() ? '5s' : null)
+            ->poll(fn (): ?string => $this->shouldPollForShipmentUpdate() ? '5s' : null)
             ->columns([
                 TextColumn::make('carrier')
                     ->label('Куриер')
@@ -160,14 +160,16 @@ class ShipmentsRelationManager extends RelationManager
         return false;
     }
 
-    private function shouldPollForStripeShipment(): bool
+    private function shouldPollForShipmentUpdate(): bool
     {
         $order = $this->getOwnerRecord();
 
-        if (! $order || $order->payment_method !== 'stripe') {
+        if (! $order) {
             return false;
         }
 
-        return ! $order->shipments()->exists();
+        return $order->shipments()
+            ->whereIn('status', ['created', 'pending'])
+            ->exists();
     }
 }
