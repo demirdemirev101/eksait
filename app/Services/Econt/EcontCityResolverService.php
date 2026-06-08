@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 class EcontCityResolverService
 {
     private const ALL_OFFICES_CACHE_KEY = 'econt_offices_all';
+    private const CITY_OFFICES_CACHE_DAYS = 7;
 
     public function __construct(
         private EcontService $econtService
@@ -88,31 +89,45 @@ class EcontCityResolverService
 
         $cacheKey = 'econt_offices_city_'.md5($normalizedCityName);
 
-        return Cache::remember($cacheKey, now()->addDays(7), function () use ($cityName, $normalizedCityName) {
-            try {
-                $allOffices = Cache::remember(self::ALL_OFFICES_CACHE_KEY, now()->addDay(), function () {
-                    return $this->econtService->getOffices();
-                });
+        $cached = Cache::get($cacheKey);
 
-                $offices = array_values(array_filter($allOffices, function ($office) use ($normalizedCityName) {
-                    return is_array($office) && $this->officeMatchesCity($office, $normalizedCityName);
-                }));
+        if (is_array($cached) && $cached !== []) {
+            return $cached;
+        }
 
-                Log::info('Econt offices resolved by city name', [
-                    'city' => $cityName,
-                    'count' => count($offices),
-                ]);
+        try {
+            $cityId = $this->getCityId($cityName);
+            $offices = $cityId !== null
+                ? $this->fetchOfficesByCityId($cityId, $normalizedCityName)
+                : [];
 
-                return $offices;
-            } catch (\Throwable $e) {
-                Log::error('Econt offices lookup failed', [
-                    'city' => $cityName,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return [];
+            if ($offices === []) {
+                $offices = $this->fetchAndFilterAllOffices($normalizedCityName);
             }
-        });
+
+            if ($offices !== []) {
+                Cache::put($cacheKey, $offices, now()->addDays(self::CITY_OFFICES_CACHE_DAYS));
+            } else {
+                Cache::forget($cacheKey);
+            }
+
+            Log::info('Econt offices resolved by city name', [
+                'city' => $cityName,
+                'city_id' => $cityId,
+                'count' => count($offices),
+            ]);
+
+            return $offices;
+        } catch (\Throwable $e) {
+            Cache::forget($cacheKey);
+
+            Log::error('Econt offices lookup failed', [
+                'city' => $cityName,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     public function getOfficeByCode(string $officeCode): ?array
@@ -140,6 +155,34 @@ class EcontCityResolverService
         }
 
         return null;
+    }
+
+    private function fetchOfficesByCityId(int $cityId, string $normalizedCityName): array
+    {
+        $offices = $this->econtService->getOffices($cityId);
+
+        return array_values(array_filter($offices, function ($office) use ($normalizedCityName) {
+            return is_array($office) && $this->officeMatchesCity($office, $normalizedCityName);
+        }));
+    }
+
+    private function fetchAndFilterAllOffices(string $normalizedCityName): array
+    {
+        $allOffices = Cache::get(self::ALL_OFFICES_CACHE_KEY);
+
+        if (! is_array($allOffices) || $allOffices === []) {
+            $allOffices = $this->econtService->getOffices();
+
+            if (is_array($allOffices) && $allOffices !== []) {
+                Cache::put(self::ALL_OFFICES_CACHE_KEY, $allOffices, now()->addDay());
+            } else {
+                Cache::forget(self::ALL_OFFICES_CACHE_KEY);
+            }
+        }
+
+        return array_values(array_filter($allOffices, function ($office) use ($normalizedCityName) {
+            return is_array($office) && $this->officeMatchesCity($office, $normalizedCityName);
+        }));
     }
 
     public function getOfficeByName(string $cityName, string $officeName): ?array
