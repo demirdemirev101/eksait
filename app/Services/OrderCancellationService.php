@@ -22,7 +22,6 @@ class OrderCancellationService
         private EcontService $econtService,
         private OrderService $orderService,
         private ShipmentCancellationService $shipmentCancellationService,
-        private StripeRefundService $stripeRefundService,
     ) {}
 
     public function cancel(Order $order): void
@@ -145,6 +144,6 @@ class OrderCancellationService
             return;
         }
 
-        $this->stripeRefundService->refund($order, $remaining);
+        app(StripeRefundService::class)->refund($order, $remaining);
     }
 }

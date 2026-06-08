@@ -18,7 +18,6 @@ class OrderReturnRequestService
     public function __construct(
         private CancelOrderPolicy $cancelOrderPolicy,
         private EcontShippingService $econtShippingService,
-        private StripeRefundService $stripeRefundService,
     ) {}
 
     public function requestReturn(Order $order): Shipment
@@ -86,7 +85,7 @@ class OrderReturnRequestService
             return;
         }
 
-        $this->stripeRefundService->refund($order, $remaining, OrderStatus::RETURN_REQUESTED);
+        app(StripeRefundService::class)->refund($order, $remaining, OrderStatus::RETURN_REQUESTED);
     }
 
     private function remainingStripeRefund(Order $order): float
