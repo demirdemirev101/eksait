@@ -18,15 +18,7 @@ class ProductApiController extends Controller
      */
     public function index()
     {
-        $products = Product::with([
-            'categories:id,name,slug',
-            'images:id,product_id,image_path,is_primary,sort_order',
-            'variants:id,product_id,size,price,sale_price,stock,quantity',
-            'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
-            'relatedProducts.categories:id,name,slug',
-            'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
-            'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
-        ])->get();
+        $products = $this->catalogQuery()->get();
 
         return ProductAPIResource::collection($products);
     }
@@ -43,38 +35,8 @@ class ProductApiController extends Controller
         $normalized = mb_strtolower($query);
         $slugQuery = Str::slug($query);
 
-        $products = Product::query()
-            ->with([
-                'categories:id,name,slug',
-                'images:id,product_id,image_path,is_primary,sort_order',
-                'variants:id,product_id,size,price,sale_price,stock,quantity',
-                'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
-                'relatedProducts.categories:id,name,slug',
-                'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
-                'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
-            ])
-            ->where(function ($q) use ($normalized, $slugQuery) {
-                $q->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereRaw('LOWER(description) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereRaw('LOWER(extra_information) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereHas('variants', function ($variantQuery) use ($normalized) {
-                        $variantQuery->whereRaw('LOWER(size) LIKE ?', ["%{$normalized}%"]);
-                    })
-                    ->orWhereHas('categories', function ($categoryQuery) use ($normalized, $slugQuery) {
-                        $categoryQuery
-                            ->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
-                            ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"]);
-
-                        if ($slugQuery !== '') {
-                            $categoryQuery->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
-                        }
-                    });
-
-                if ($slugQuery !== '') {
-                    $q->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
-                }
-            })
+        $products = $this->catalogQuery()
+            ->where(fn ($q) => $this->applySearch($q, $normalized, $slugQuery))
             ->limit($limit)
             ->get();
 
@@ -83,15 +45,7 @@ class ProductApiController extends Controller
 
     public function equipment()
     {
-        $products = Product::with([
-            'categories:id,name,slug',
-            'images:id,product_id,image_path,is_primary,sort_order',
-            'variants:id,product_id,size,price,sale_price,stock,quantity',
-            'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
-            'relatedProducts.categories:id,name,slug',
-            'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
-            'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
-        ])
+        $products = $this->catalogQuery()
         ->whereHas('categories', function ($categoryQuery) {
             $categoryQuery->where('slug', 'equipment');
         })
@@ -112,44 +66,62 @@ class ProductApiController extends Controller
         $normalized = mb_strtolower($query);
         $slugQuery = Str::slug($query);
 
-        $products = Product::query()
-            ->with([
-                'categories:id,name,slug',
-                'images:id,product_id,image_path,is_primary,sort_order',
-                'variants:id,product_id,size,price,sale_price,stock,quantity',
-                'relatedProducts:id,name,slug,price,sale_price,stock,quantity',
-                'relatedProducts.categories:id,name,slug',
-                'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
-                'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
-            ])
+        $products = $this->catalogQuery()
             ->whereHas('categories', function ($categoryQuery) {
                 $categoryQuery->where('slug', 'equipment');
             })
-            ->where(function ($q) use ($normalized, $slugQuery) {
-                $q->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereRaw('LOWER(description) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereRaw('LOWER(extra_information) LIKE ?', ["%{$normalized}%"])
-                    ->orWhereHas('variants', function ($variantQuery) use ($normalized) {
-                        $variantQuery->whereRaw('LOWER(size) LIKE ?', ["%{$normalized}%"]);
-                    })
-                    ->orWhereHas('categories', function ($categoryQuery) use ($normalized, $slugQuery) {
-                        $categoryQuery
-                            ->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
-                            ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"]);
-
-                        if ($slugQuery !== '') {
-                            $categoryQuery->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
-                        }
-                    });
-
-                if ($slugQuery !== '') {
-                    $q->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
-                }
-            })
+            ->where(fn ($q) => $this->applySearch($q, $normalized, $slugQuery))
             ->limit($limit)
             ->get();
 
         return ProductAPIResource::collection($products)->response();
+    }
+
+    private function catalogQuery()
+    {
+        return Product::query()->with([
+            'categories:id,name,name_en,name_de,slug',
+            'images:id,product_id,image_path,is_primary,sort_order',
+            'variants:id,product_id,size,size_en,size_de,price,sale_price,stock,quantity',
+            'relatedProducts:id,name,name_en,name_de,slug,price,sale_price,stock,quantity',
+            'relatedProducts.categories:id,name,name_en,name_de,slug',
+            'relatedProducts.primaryImage:id,product_id,image_path,is_primary,sort_order',
+            'relatedProducts.images:id,product_id,image_path,is_primary,sort_order',
+        ]);
+    }
+
+    private function applySearch($query, string $normalized, string $slugQuery): void
+    {
+        $query->whereRaw('LOWER(name) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(name_en, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(name_de, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(description, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(description_en, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(description_de, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(extra_information, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(extra_information_en, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereRaw('LOWER(COALESCE(extra_information_de, \'\')) LIKE ?', ["%{$normalized}%"])
+            ->orWhereHas('variants', function ($variantQuery) use ($normalized) {
+                $variantQuery
+                    ->whereRaw('LOWER(COALESCE(size, \'\')) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(COALESCE(size_en, \'\')) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(COALESCE(size_de, \'\')) LIKE ?', ["%{$normalized}%"]);
+            })
+            ->orWhereHas('categories', function ($categoryQuery) use ($normalized, $slugQuery) {
+                $categoryQuery
+                    ->whereRaw('LOWER(COALESCE(name, \'\')) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(COALESCE(name_en, \'\')) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(COALESCE(name_de, \'\')) LIKE ?', ["%{$normalized}%"])
+                    ->orWhereRaw('LOWER(slug) LIKE ?', ["%{$normalized}%"]);
+
+                if ($slugQuery !== '') {
+                    $categoryQuery->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
+                }
+            });
+
+        if ($slugQuery !== '') {
+            $query->orWhereRaw('LOWER(slug) LIKE ?', ["%{$slugQuery}%"]);
+        }
     }
 }

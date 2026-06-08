@@ -54,16 +54,42 @@ class HomeBannerResource extends Resource
                     TextInput::make('eyebrow')
                         ->label('Надзаглавие')
                         ->maxLength(255),
+                    TextInput::make('eyebrow_en')
+                        ->label('Надзаглавие (EN)')
+                        ->maxLength(255),
+                    TextInput::make('eyebrow_de')
+                        ->label('Надзаглавие (DE)')
+                        ->maxLength(255),
                     TextInput::make('title')
                         ->label('Заглавие')
                         ->required()
+                        ->maxLength(255),
+                    TextInput::make('title_en')
+                        ->label('Заглавие (EN)')
+                        ->maxLength(255),
+                    TextInput::make('title_de')
+                        ->label('Заглавие (DE)')
                         ->maxLength(255),
                     Textarea::make('subtitle')
                         ->label('Подзаглавие')
                         ->rows(3)
                         ->columnSpanFull(),
+                    Textarea::make('subtitle_en')
+                        ->label('Подзаглавие (EN)')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                    Textarea::make('subtitle_de')
+                        ->label('Подзаглавие (DE)')
+                        ->rows(3)
+                        ->columnSpanFull(),
                     TextInput::make('button_text')
                         ->label('Текст на бутона')
+                        ->maxLength(255),
+                    TextInput::make('button_text_en')
+                        ->label('Текст на бутона (EN)')
+                        ->maxLength(255),
+                    TextInput::make('button_text_de')
+                        ->label('Текст на бутона (DE)')
                         ->maxLength(255),
                     TextInput::make('button_url')
                         ->label('Линк на бутона')

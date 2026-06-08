@@ -15,6 +15,10 @@ class CategoryForm
                 TextInput::make('name')
                     ->label('Име')
                     ->required(),
+                TextInput::make('name_en')
+                    ->label('Име (EN)'),
+                TextInput::make('name_de')
+                    ->label('Име (DE)'),
                 TextInput::make('slug')
                     ->label('Кратък адрес')
                     ->dehydrated()

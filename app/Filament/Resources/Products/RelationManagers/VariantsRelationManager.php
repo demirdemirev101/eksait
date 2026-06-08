@@ -36,6 +36,14 @@ class VariantsRelationManager extends RelationManager
                                 ->label('Тип/Размер')
                                 ->required()
                                 ->maxLength(255),
+                            TextInput::make('size_en')
+                                ->label('Тип/Размер (EN)')
+                                ->maxLength(255),
+                            TextInput::make('size_de')
+                                ->label('Тип/Размер (DE)')
+                                ->maxLength(255),
+                        ]),
+                        Grid::make(2)->schema([
                             TextInput::make('price')
                                 ->label('Цена')
                                 ->numeric()

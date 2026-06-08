@@ -11,9 +11,17 @@ class HomeBanner extends Model
 
     protected $fillable = [
         'eyebrow',
+        'eyebrow_en',
+        'eyebrow_de',
         'title',
+        'title_en',
+        'title_de',
         'subtitle',
+        'subtitle_en',
+        'subtitle_de',
         'button_text',
+        'button_text_en',
+        'button_text_de',
         'button_url',
         'image',
         'is_active',

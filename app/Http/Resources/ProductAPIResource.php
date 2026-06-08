@@ -2,8 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Support\LocalizedContent;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 
 class ProductAPIResource extends JsonResource
 {
@@ -14,8 +16,9 @@ class ProductAPIResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $locale = LocalizedContent::requestedLocale($request);
         $variants = $this->whenLoaded('variants');
-        $hasVariants = $variants instanceof \Illuminate\Support\Collection && $variants->isNotEmpty();
+        $hasVariants = $variants instanceof Collection && $variants->isNotEmpty();
         $availableVariants = $hasVariants
             ? $variants->filter(fn ($variant) => (bool) $variant->stock && (int) $variant->quantity > 0)
             : collect();
@@ -23,7 +26,9 @@ class ProductAPIResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'name' => $this->name,
+            'name' => LocalizedContent::localizedValue($this->resource, 'name', $locale),
+            'name_en' => $this->name_en,
+            'name_de' => $this->name_de,
             'slug' => $this->slug,
 
             'price' => number_format((float) $this->price, 2, '.', ''),
@@ -34,40 +39,25 @@ class ProductAPIResource extends JsonResource
             'quantity' => $hasVariants
                 ? 0
                 : max(0, (int) $this->quantity),
-            'description' => $this->description,
-            'extra_information' => $this->extra_information,
-            'categories' => $this->categories,
+            'description' => LocalizedContent::localizedValue($this->resource, 'description', $locale),
+            'description_en' => $this->description_en,
+            'description_de' => $this->description_de,
+            'extra_information' => LocalizedContent::localizedValue($this->resource, 'extra_information', $locale),
+            'extra_information_en' => $this->extra_information_en,
+            'extra_information_de' => $this->extra_information_de,
+            'translations' => LocalizedContent::translations($this->resource, [
+                'name',
+                'description',
+                'extra_information',
+            ]),
+            'categories' => $this->categories->map(
+                fn ($category) => $this->mapCategory($category, $locale)
+            )->values(),
             'variants' => $hasVariants
-                ? $variants->map(fn ($variant) => [
-                    'id' => $variant->id,
-                    'size' => $variant->size,
-                    'price' => number_format((float) $variant->price, 2, '.', ''),
-                    'sale_price' => $variant->sale_price ? number_format((float) $variant->sale_price, 2, '.', '') : null,
-                    'stock' => (bool) $variant->stock && (int) $variant->quantity > 0,
-                    'quantity' => max(0, (int) $variant->quantity),
-                ])->values()
+                ? $variants->map(fn ($variant) => $this->mapVariant($variant, $locale))->values()
                 : [],
-            'related_products' => $relatedProducts instanceof \Illuminate\Support\Collection
-                ? $relatedProducts->map(function ($related) {
-                    $imagePath = $related->primaryImage?->image_path
-                        ?? $related->images?->first()?->image_path;
-
-                    return [
-                        'id' => $related->id,
-                        'name' => $related->name,
-                        'slug' => $related->slug,
-                        'price' => number_format((float) $related->price, 2, '.', ''),
-                        'sale_price' => $related->sale_price ? number_format((float) $related->sale_price, 2, '.', '') : null,
-                        'stock' => (bool) $related->stock && (int) $related->quantity > 0,
-                        'categories' => $related->categories->map(fn ($category) => [
-                            'id' => $category->id,
-                            'name' => $category->name,
-                            'slug' => $category->slug,
-                        ])->values(),
-                        'image_path' => $imagePath,
-                        'image_url' => $imagePath ? asset('storage/' . $imagePath) : null,
-                    ];
-                })->values()
+            'related_products' => $relatedProducts instanceof Collection
+                ? $relatedProducts->map(fn ($related) => $this->mapRelatedProduct($related, $locale))->values()
                 : [],
             'images' => $this->images->map(function ($image) {
                 return [
@@ -78,5 +68,55 @@ class ProductAPIResource extends JsonResource
                 ];
             }),
         ];  
+    }
+
+    private function mapCategory(object $category, string $locale): array
+    {
+        return [
+            'id' => $category->id,
+            'name' => LocalizedContent::localizedValue($category, 'name', $locale),
+            'name_en' => $category->name_en,
+            'name_de' => $category->name_de,
+            'slug' => $category->slug,
+            'translations' => LocalizedContent::translations($category, ['name']),
+        ];
+    }
+
+    private function mapVariant(object $variant, string $locale): array
+    {
+        return [
+            'id' => $variant->id,
+            'size' => LocalizedContent::localizedValue($variant, 'size', $locale),
+            'size_en' => $variant->size_en,
+            'size_de' => $variant->size_de,
+            'price' => number_format((float) $variant->price, 2, '.', ''),
+            'sale_price' => $variant->sale_price ? number_format((float) $variant->sale_price, 2, '.', '') : null,
+            'stock' => (bool) $variant->stock && (int) $variant->quantity > 0,
+            'quantity' => max(0, (int) $variant->quantity),
+            'translations' => LocalizedContent::translations($variant, ['size']),
+        ];
+    }
+
+    private function mapRelatedProduct(object $related, string $locale): array
+    {
+        $imagePath = $related->primaryImage?->image_path
+            ?? $related->images?->first()?->image_path;
+
+        return [
+            'id' => $related->id,
+            'name' => LocalizedContent::localizedValue($related, 'name', $locale),
+            'name_en' => $related->name_en,
+            'name_de' => $related->name_de,
+            'slug' => $related->slug,
+            'price' => number_format((float) $related->price, 2, '.', ''),
+            'sale_price' => $related->sale_price ? number_format((float) $related->sale_price, 2, '.', '') : null,
+            'stock' => (bool) $related->stock && (int) $related->quantity > 0,
+            'categories' => $related->categories->map(
+                fn ($category) => $this->mapCategory($category, $locale)
+            )->values(),
+            'translations' => LocalizedContent::translations($related, ['name']),
+            'image_path' => $imagePath,
+            'image_url' => $imagePath ? asset('storage/' . $imagePath) : null,
+        ];
     }
 }
