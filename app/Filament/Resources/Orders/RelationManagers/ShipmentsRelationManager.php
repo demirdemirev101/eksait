@@ -44,7 +44,7 @@ class ShipmentsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->poll(fn (): ?string => $this->shouldPollForShipmentUpdate() ? '5s' : null)
+            ->poll(fn (): ?string => $this->shouldPollForShipmentUpdate() ? '3s' : null)
             ->columns([
                 TextColumn::make('carrier')
                     ->label('Куриер')
@@ -168,8 +168,13 @@ class ShipmentsRelationManager extends RelationManager
             return false;
         }
 
-        return $order->shipments()
-            ->whereIn('status', ['created', 'pending'])
-            ->exists();
+        $shipments = $order->shipments();
+
+        if ($shipments->whereIn('status', ['created', 'pending'])->exists()) {
+            return true;
+        }
+
+        return ! $shipments->exists()
+            && $order->status === OrderStatus::READY_FOR_SHIPMENT->value;
     }
 }
