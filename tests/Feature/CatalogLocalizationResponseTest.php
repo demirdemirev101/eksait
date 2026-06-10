@@ -27,6 +27,7 @@ class CatalogLocalizationResponseTest extends TestCase
             'quantity' => 5,
             'description' => 'СВРЕДЛО ЗА ЛАМАРИНА',
             'extra_information' => 'Допълнителна информация',
+            'extra_information_en' => 'Extra information',
         ]);
 
         $category = Category::create([
@@ -50,7 +51,7 @@ class CatalogLocalizationResponseTest extends TestCase
         $this->assertSame($product->slug, $payload['slug']);
         $this->assertSame('DRILL FOR METAL A', $payload['name']);
         $this->assertSame('DRILL FOR SHEET METAL', $payload['description']);
-        $this->assertSame('Допълнителна информация', $payload['extra_information']);
+        $this->assertSame('Extra information', $payload['extra_information']);
         $this->assertSame('DRILLS', $payload['categories'][0]['name']);
         $this->assertSame('Ø0.22 SHEET METAL', $payload['variants'][0]['size']);
         $this->assertSame('DRILL FOR METAL A', $payload['translations']['en']['name']);

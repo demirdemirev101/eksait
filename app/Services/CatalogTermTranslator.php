@@ -33,17 +33,64 @@ class CatalogTermTranslator
                 $translated = $this->applyLegacyFallback($text, $targetLocale);
             }
 
-            return $translated !== '' ? $translated : $text;
+            return $this->normalizeForLocale($translated !== '' ? $translated : $text, $targetLocale);
         });
+    }
+
+    public function translateOffline(mixed $value, string $targetLocale, string $sourceLocale = 'bg'): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $text = trim($value);
+        $targetLocale = strtolower(trim($targetLocale));
+        $sourceLocale = strtolower(trim($sourceLocale));
+
+        if ($text === '' || $targetLocale === '' || $targetLocale === $sourceLocale) {
+            return $value;
+        }
+
+        $translated = $this->applyLegacyFallback($text, $targetLocale);
+
+        return $this->normalizeForLocale($translated !== '' ? $translated : $text, $targetLocale);
+    }
+
+    public function normalizeForLocale(mixed $value, string $targetLocale): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $text = trim($value);
+        $targetLocale = strtolower(trim($targetLocale));
+
+        if ($text === '' || $targetLocale === 'bg') {
+            return $value;
+        }
+
+        if (! preg_match('/\p{Cyrillic}/u', $text)) {
+            return $text;
+        }
+
+        $normalized = $this->transliterateCyrillicToLatin($text);
+
+        return $normalized !== '' ? preg_replace('/\s+/u', ' ', trim($normalized)) : $text;
     }
 
     private function translateViaProvider(string $text, string $targetLocale, string $sourceLocale): ?string
     {
-        if (strtolower((string) config('catalog_translation.provider', 'libretranslate')) !== 'libretranslate') {
-            return null;
-        }
+        return match (strtolower((string) config('catalog_translation.provider', 'libretranslate'))) {
+            'google' => $this->translateViaGoogle($text, $targetLocale, $sourceLocale),
+            'libretranslate' => $this->translateViaLibreTranslate($text, $targetLocale, $sourceLocale),
+            default => null,
+        };
+    }
 
-        $baseUrl = rtrim((string) config('catalog_translation.base_url', ''), '/');
+    private function translateViaLibreTranslate(string $text, string $targetLocale, string $sourceLocale): ?string
+    {
+        $baseUrl = rtrim((string) config('catalog_translation.libretranslate.base_url', config('catalog_translation.base_url', '')), '/');
+
         if ($baseUrl === '') {
             return null;
         }
@@ -60,7 +107,9 @@ class CatalogTermTranslator
                     'source' => $sourceLocale,
                     'target' => $targetLocale,
                     'format' => 'text',
-                    'api_key' => blank(config('catalog_translation.api_key')) ? null : (string) config('catalog_translation.api_key'),
+                    'api_key' => blank(config('catalog_translation.libretranslate.api_key', config('catalog_translation.api_key')))
+                        ? null
+                        : (string) config('catalog_translation.libretranslate.api_key', config('catalog_translation.api_key')),
                 ], static fn ($value) => $value !== null && $value !== ''));
 
             if (! $response->successful()) {
@@ -74,6 +123,50 @@ class CatalogTermTranslator
             }
 
             return $this->restorePlaceholders($translated, $restorers);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function translateViaGoogle(string $text, string $targetLocale, string $sourceLocale): ?string
+    {
+        $baseUrl = rtrim((string) config('catalog_translation.google.base_url', ''), '/');
+        $apiKey = trim((string) config('catalog_translation.google.api_key', ''));
+        $endpoint = '/' . ltrim((string) config('catalog_translation.google.endpoint', '/language/translate/v2'), '/');
+
+        if ($baseUrl === '' || $apiKey === '') {
+            return null;
+        }
+
+        [$preparedText, $restorers] = $this->prepareText($text, $targetLocale);
+
+        try {
+            $response = Http::baseUrl($baseUrl)
+                ->asForm()
+                ->acceptJson()
+                ->timeout((int) config('catalog_translation.timeout', 20))
+                ->withQueryParameters(['key' => $apiKey])
+                ->post($endpoint, array_filter([
+                    'q' => $preparedText,
+                    'source' => $sourceLocale,
+                    'target' => $targetLocale,
+                    'format' => 'text',
+                ], static fn ($value) => $value !== null && $value !== ''));
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $translated = $response->json('data.translations.0.translatedText');
+
+            if (! is_string($translated) || trim($translated) === '') {
+                return null;
+            }
+
+            return $this->restorePlaceholders(
+                html_entity_decode($translated, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                $restorers
+            );
         } catch (Throwable) {
             return null;
         }
@@ -206,6 +299,74 @@ class CatalogTermTranslator
         }
 
         return trim((string) preg_replace('/\s+/u', ' ', $translated));
+    }
+
+    private function transliterateCyrillicToLatin(string $text): string
+    {
+        $map = [
+            'А' => 'A',
+            'Б' => 'B',
+            'В' => 'V',
+            'Г' => 'G',
+            'Д' => 'D',
+            'Е' => 'E',
+            'Ж' => 'ZH',
+            'З' => 'Z',
+            'И' => 'I',
+            'Й' => 'Y',
+            'К' => 'K',
+            'Л' => 'L',
+            'М' => 'M',
+            'Н' => 'N',
+            'О' => 'O',
+            'П' => 'P',
+            'Р' => 'R',
+            'С' => 'S',
+            'Т' => 'T',
+            'У' => 'U',
+            'Ф' => 'F',
+            'Х' => 'H',
+            'Ц' => 'TS',
+            'Ч' => 'CH',
+            'Ш' => 'SH',
+            'Щ' => 'SHT',
+            'Ъ' => 'A',
+            'Ь' => 'Y',
+            'Ю' => 'YU',
+            'Я' => 'YA',
+            'а' => 'a',
+            'б' => 'b',
+            'в' => 'v',
+            'г' => 'g',
+            'д' => 'd',
+            'е' => 'e',
+            'ж' => 'zh',
+            'з' => 'z',
+            'и' => 'i',
+            'й' => 'y',
+            'к' => 'k',
+            'л' => 'l',
+            'м' => 'm',
+            'н' => 'n',
+            'о' => 'o',
+            'п' => 'p',
+            'р' => 'r',
+            'с' => 's',
+            'т' => 't',
+            'у' => 'u',
+            'ф' => 'f',
+            'х' => 'h',
+            'ц' => 'ts',
+            'ч' => 'ch',
+            'ш' => 'sh',
+            'щ' => 'sht',
+            'ъ' => 'a',
+            'ь' => 'y',
+            'ю' => 'yu',
+            'я' => 'ya',
+        ];
+
+        return strtr($text, $map);
     }
 
     private function cacheKey(string $text, string $targetLocale, string $sourceLocale): string

@@ -41,6 +41,12 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
+    'google_translate' => [
+        'base_url' => env('GOOGLE_TRANSLATE_BASE_URL', 'https://translation.googleapis.com'),
+        'api_key' => env('GOOGLE_TRANSLATE_API_KEY'),
+        'endpoint' => env('GOOGLE_TRANSLATE_ENDPOINT', '/language/translate/v2'),
+    ],
+
     'econt' => [
         'enabled' => env('ECONT_ENABLED'),
         'sandbox' => env('ECONT_SANDBOX'),

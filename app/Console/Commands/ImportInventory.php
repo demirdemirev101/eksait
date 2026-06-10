@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\CatalogTermTranslator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +19,8 @@ class ImportInventory extends Command
     protected $description = 'Import inventory products from XLSX files';
 
     private array $categoryCache = [];
+
+    private array $translationCache = [];
 
     public function handle(): int
     {
@@ -70,11 +73,20 @@ class ImportInventory extends Command
                 $product = Product::query()->firstOrNew(['slug' => $productData['slug']]);
 
                 $product->name = $productData['name'];
+                $product->name_en = $this->translateCatalogText($productData['name'], true);
 
                 if ($productData['variant_name'] === null) {
                     $product->price = $row['price'];
                     $product->quantity = $row['quantity'];
                     $product->stock = $row['quantity'] > 0;
+                }
+
+                if (filled($product->description)) {
+                    $product->description_en = $this->translateCatalogText((string) $product->description, false);
+                }
+
+                if (filled($product->extra_information)) {
+                    $product->extra_information_en = $this->translateCatalogText((string) $product->extra_information, false);
                 }
 
                 $product->exists ? $updatedProducts++ : $createdProducts++;
@@ -90,6 +102,7 @@ class ImportInventory extends Command
                         'size' => $productData['variant_name'],
                     ]);
 
+                    $variant->size_en = $this->translateCatalogText($productData['variant_name'], true);
                     $variant->price = $row['price'];
                     $variant->quantity = $row['quantity'];
                     $variant->stock = $row['quantity'] > 0;
@@ -404,10 +417,34 @@ class ImportInventory extends Command
     {
         if (! isset($this->categoryCache[$name])) {
             $category = Category::query()->firstOrCreate(['name' => $name]);
+            $category->name_en = $this->translateCatalogText($name, true);
+            $category->saveQuietly();
             $this->categoryCache[$name] = $category->id;
         }
 
         return $this->categoryCache[$name];
+    }
+
+    private function translateCatalogText(string $value, bool $uppercase = true): string
+    {
+        $text = trim($value);
+
+        if ($text === '') {
+            return '';
+        }
+
+        $cacheKey = ($uppercase ? 'upper:' : 'plain:') . $text;
+
+        if (array_key_exists($cacheKey, $this->translationCache)) {
+            return $this->translationCache[$cacheKey];
+        }
+
+        $translated = app(CatalogTermTranslator::class)->translateOffline($text, 'en', 'bg');
+        $translated = is_string($translated) ? trim($translated) : '';
+        $translated = $translated !== '' ? $translated : $text;
+        $translated = $uppercase ? Str::upper($translated) : $translated;
+
+        return $this->translationCache[$cacheKey] = $translated;
     }
 
     private function normalizeCategoryName(string $name): string
