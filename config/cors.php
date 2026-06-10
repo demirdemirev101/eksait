@@ -1,5 +1,7 @@
 <?php
 
+$isLocalEnvironment = env('APP_ENV', 'production') === 'local';
+
 return [
 
     /*

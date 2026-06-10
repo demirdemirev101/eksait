@@ -3,47 +3,29 @@
 namespace App\Http\Controllers;
 
 use App\Models\HomeBanner;
-use App\Support\LocalizedContent;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class HomeBannerController extends Controller
 {
-    public function show(Request $request): JsonResponse
+    public function show(): JsonResponse
     {
-        $locale = LocalizedContent::requestedLocale($request);
-
         $items = HomeBanner::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->map(function (HomeBanner $banner) use ($locale): array {
+            ->map(function (HomeBanner $banner): array {
                 return [
                     'id' => $banner->id,
-                    'eyebrow' => LocalizedContent::localizedValue($banner, 'eyebrow', $locale),
-                    'eyebrow_en' => $banner->eyebrow_en,
-                    'eyebrow_de' => $banner->eyebrow_de,
-                    'title' => LocalizedContent::localizedValue($banner, 'title', $locale),
-                    'title_en' => $banner->title_en,
-                    'title_de' => $banner->title_de,
-                    'subtitle' => LocalizedContent::localizedValue($banner, 'subtitle', $locale),
-                    'subtitle_en' => $banner->subtitle_en,
-                    'subtitle_de' => $banner->subtitle_de,
-                    'button_text' => LocalizedContent::localizedValue($banner, 'button_text', $locale),
-                    'button_text_en' => $banner->button_text_en,
-                    'button_text_de' => $banner->button_text_de,
-                    'button_url' => $banner->button_url,
+                    'eyebrow' => $banner->eyebrow,
+                    'title' => $banner->title,
+                    'subtitle' => $banner->subtitle,
+                    'button_text' => $banner->button_text,
+                    'button_url' => '/products',
                     'image' => $banner->image,
                     'image_url' => $banner->image ? Storage::disk('public')->url($banner->image) : null,
                     'sort_order' => $banner->sort_order,
-                    'translations' => LocalizedContent::translations($banner, [
-                        'eyebrow',
-                        'title',
-                        'subtitle',
-                        'button_text',
-                    ]),
                 ];
             })
             ->values();
@@ -57,7 +39,7 @@ class HomeBannerController extends Controller
             'home_banner_title' => $first['title'] ?? null,
             'home_banner_subtitle' => $first['subtitle'] ?? null,
             'home_banner_button_text' => $first['button_text'] ?? null,
-            'home_banner_button_url' => $first['button_url'] ?? null,
+            'home_banner_button_url' => '/products',
             'home_banner_image' => $first['image'] ?? null,
             'home_banner_image_url' => $first['image_url'] ?? null,
         ]);

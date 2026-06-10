@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CatalogLocalizationResponseTest extends TestCase
@@ -17,32 +18,26 @@ class CatalogLocalizationResponseTest extends TestCase
 
     public function test_product_resource_localizes_catalog_fields_and_keeps_stable_keys(): void
     {
+        $this->bootFakeTranslator();
+
         $product = Product::create([
-            'name' => 'ФРЕЗА 2 ПЕРА',
-            'name_en' => '2-flute end mill',
-            'name_de' => 'Zweischneider Fraeser',
+            'name' => 'СВРЕДЛО ЗА МЕТАЛ A',
             'price' => 12.5,
             'stock' => true,
             'quantity' => 5,
-            'description' => 'Базово описание',
-            'description_en' => 'English description',
+            'description' => 'СВРЕДЛО ЗА ЛАМАРИНА',
             'extra_information' => 'Допълнителна информация',
-            'extra_information_en' => 'Extra information',
         ]);
 
         $category = Category::create([
-            'name' => 'Инструменти',
-            'name_en' => 'Tools',
-            'name_de' => 'Werkzeuge',
+            'name' => 'СВРЕДЛА',
         ]);
 
         $product->categories()->attach($category);
 
         ProductVariant::create([
             'product_id' => $product->id,
-            'size' => 'МАЛКА',
-            'size_en' => 'Small',
-            'size_de' => 'Klein',
+            'size' => 'Ф0.22 ЛАМАРИНА',
             'price' => 13.5,
             'quantity' => 2,
         ]);
@@ -53,34 +48,23 @@ class CatalogLocalizationResponseTest extends TestCase
 
         $this->assertSame($product->id, $payload['id']);
         $this->assertSame($product->slug, $payload['slug']);
-        $this->assertSame('2-flute end mill', $payload['name']);
-        $this->assertSame('2-flute end mill', $payload['name_en']);
-        $this->assertSame('English description', $payload['description']);
-        $this->assertSame('Extra information', $payload['extra_information']);
-        $this->assertSame('Tools', $payload['categories'][0]['name']);
-        $this->assertSame('Small', $payload['variants'][0]['size']);
-        $this->assertSame('ФРЕЗА 2 ПЕРА', $payload['translations']['bg']['name']);
-        $this->assertSame('2-flute end mill', $payload['translations']['en']['name']);
+        $this->assertSame('DRILL FOR METAL A', $payload['name']);
+        $this->assertSame('DRILL FOR SHEET METAL', $payload['description']);
+        $this->assertSame('Допълнителна информация', $payload['extra_information']);
+        $this->assertSame('DRILLS', $payload['categories'][0]['name']);
+        $this->assertSame('Ø0.22 SHEET METAL', $payload['variants'][0]['size']);
+        $this->assertSame('DRILL FOR METAL A', $payload['translations']['en']['name']);
         $this->assertArrayHasKey('price', $payload);
         $this->assertArrayHasKey('stock', $payload);
     }
 
-    public function test_home_banner_endpoint_localizes_banner_text_and_keeps_legacy_fields(): void
+    public function test_home_banner_endpoint_returns_fixed_products_link(): void
     {
         HomeBanner::create([
             'eyebrow' => 'Ново',
-            'eyebrow_en' => 'New',
-            'eyebrow_de' => 'Neu',
             'title' => 'Банер',
-            'title_en' => 'Banner',
-            'title_de' => 'Banner DE',
             'subtitle' => 'Подзаглавие',
-            'subtitle_en' => 'Subtitle',
-            'subtitle_de' => 'Untertitel',
             'button_text' => 'Виж',
-            'button_text_en' => 'View',
-            'button_text_de' => 'Ansehen',
-            'button_url' => '/catalog',
             'is_active' => true,
             'sort_order' => 1,
         ]);
@@ -88,13 +72,41 @@ class CatalogLocalizationResponseTest extends TestCase
         $response = $this->getJson('/api/home-banner?lang=de');
 
         $response->assertOk();
-        $response->assertJsonPath('items.0.eyebrow', 'Neu');
-        $response->assertJsonPath('items.0.title', 'Banner DE');
-        $response->assertJsonPath('items.0.subtitle', 'Untertitel');
-        $response->assertJsonPath('items.0.button_text', 'Ansehen');
-        $response->assertJsonPath('items.0.eyebrow_en', 'New');
-        $response->assertJsonPath('items.0.translations.en.title', 'Banner');
-        $response->assertJsonPath('home_banner_title', 'Banner DE');
-        $response->assertJsonPath('home_banner_button_text', 'Ansehen');
+        $response->assertJsonPath('items.0.eyebrow', 'Ново');
+        $response->assertJsonPath('items.0.title', 'Банер');
+        $response->assertJsonPath('items.0.subtitle', 'Подзаглавие');
+        $response->assertJsonPath('items.0.button_text', 'Виж');
+        $response->assertJsonPath('items.0.button_url', '/products');
+        $response->assertJsonPath('home_banner_title', 'Банер');
+        $response->assertJsonPath('home_banner_button_text', 'Виж');
+        $response->assertJsonPath('home_banner_button_url', '/products');
+    }
+
+    private function bootFakeTranslator(): void
+    {
+        config([
+            'catalog_translation.provider' => 'libretranslate',
+            'catalog_translation.base_url' => 'http://translator.test',
+            'catalog_translation.cache_store' => 'array',
+        ]);
+
+        Http::fake(function ($request) {
+            $data = $request->data();
+            $q = (string) ($data['q'] ?? '');
+            $target = (string) ($data['target'] ?? '');
+            $translated = $this->translateFakePayload($q, $target);
+
+            return Http::response([
+                'translatedText' => $translated,
+            ], 200);
+        });
+    }
+
+    private function translateFakePayload(string $text, string $target): string
+    {
+        return match ($text . '|' . $target) {
+            'Ново|de' => 'Neu',
+            default => $text,
+        };
     }
 }

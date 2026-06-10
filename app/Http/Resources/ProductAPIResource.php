@@ -27,8 +27,6 @@ class ProductAPIResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => LocalizedContent::localizedValue($this->resource, 'name', $locale),
-            'name_en' => $this->name_en,
-            'name_de' => $this->name_de,
             'slug' => $this->slug,
 
             'price' => number_format((float) $this->price, 2, '.', ''),
@@ -40,11 +38,7 @@ class ProductAPIResource extends JsonResource
                 ? 0
                 : max(0, (int) $this->quantity),
             'description' => LocalizedContent::localizedValue($this->resource, 'description', $locale),
-            'description_en' => $this->description_en,
-            'description_de' => $this->description_de,
             'extra_information' => LocalizedContent::localizedValue($this->resource, 'extra_information', $locale),
-            'extra_information_en' => $this->extra_information_en,
-            'extra_information_de' => $this->extra_information_de,
             'translations' => LocalizedContent::translations($this->resource, [
                 'name',
                 'description',
@@ -75,8 +69,6 @@ class ProductAPIResource extends JsonResource
         return [
             'id' => $category->id,
             'name' => LocalizedContent::localizedValue($category, 'name', $locale),
-            'name_en' => $category->name_en,
-            'name_de' => $category->name_de,
             'slug' => $category->slug,
             'translations' => LocalizedContent::translations($category, ['name']),
         ];
@@ -87,8 +79,6 @@ class ProductAPIResource extends JsonResource
         return [
             'id' => $variant->id,
             'size' => LocalizedContent::localizedValue($variant, 'size', $locale),
-            'size_en' => $variant->size_en,
-            'size_de' => $variant->size_de,
             'price' => number_format((float) $variant->price, 2, '.', ''),
             'sale_price' => $variant->sale_price ? number_format((float) $variant->sale_price, 2, '.', '') : null,
             'stock' => (bool) $variant->stock && (int) $variant->quantity > 0,
@@ -105,8 +95,6 @@ class ProductAPIResource extends JsonResource
         return [
             'id' => $related->id,
             'name' => LocalizedContent::localizedValue($related, 'name', $locale),
-            'name_en' => $related->name_en,
-            'name_de' => $related->name_de,
             'slug' => $related->slug,
             'price' => number_format((float) $related->price, 2, '.', ''),
             'sale_price' => $related->sale_price ? number_format((float) $related->sale_price, 2, '.', '') : null,

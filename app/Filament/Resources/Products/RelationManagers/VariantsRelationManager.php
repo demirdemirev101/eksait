@@ -21,36 +21,30 @@ class VariantsRelationManager extends RelationManager
 {
     protected static string $relationship = 'variants';
 
-    protected static ?string $title = 'Варианти';
-    protected static ?string $modelLabel = 'вариант';
-    protected static ?string $pluralModelLabel = 'варианти';
+    protected static ?string $title = 'Variants';
+    protected static ?string $modelLabel = 'variant';
+    protected static ?string $pluralModelLabel = 'variants';
 
     public function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Основни данни')
+                Section::make('Basic data')
                     ->schema([
-                        Grid::make(3)->schema([
+                        Grid::make(1)->schema([
                             TextInput::make('size')
-                                ->label('Тип/Размер')
+                                ->label('Type / size')
                                 ->required()
-                                ->maxLength(255),
-                            TextInput::make('size_en')
-                                ->label('Тип/Размер (EN)')
-                                ->maxLength(255),
-                            TextInput::make('size_de')
-                                ->label('Тип/Размер (DE)')
                                 ->maxLength(255),
                         ]),
                         Grid::make(2)->schema([
                             TextInput::make('price')
-                                ->label('Цена')
+                                ->label('Price')
                                 ->numeric()
                                 ->prefix('EUR')
                                 ->required(),
                             TextInput::make('sale_price')
-                                ->label('Цена с отстъпка')
+                                ->label('Sale price')
                                 ->numeric()
                                 ->prefix('EUR')
                                 ->nullable(),
@@ -58,11 +52,11 @@ class VariantsRelationManager extends RelationManager
                     ])
                     ->columnSpanFull(),
 
-                Section::make('Наличност')
+                Section::make('Stock')
                     ->schema([
                         Grid::make(1)->schema([
                             TextInput::make('quantity')
-                                ->label('Количество')
+                                ->label('Quantity')
                                 ->numeric()
                                 ->integer()
                                 ->minValue(0)
@@ -72,26 +66,26 @@ class VariantsRelationManager extends RelationManager
                     ])
                     ->columnSpanFull(),
 
-                Section::make('Размери и тегло')
+                Section::make('Dimensions and weight')
                     ->schema([
                         Grid::make(4)->schema([
                             TextInput::make('weight')
-                                ->label('Тегло')
+                                ->label('Weight')
                                 ->numeric()
                                 ->suffix('kg')
                                 ->nullable(),
                             TextInput::make('height')
-                                ->label('Височина')
+                                ->label('Height')
                                 ->numeric()
                                 ->suffix('cm')
                                 ->nullable(),
                             TextInput::make('width')
-                                ->label('Ширина')
+                                ->label('Width')
                                 ->numeric()
                                 ->suffix('cm')
                                 ->nullable(),
                             TextInput::make('length')
-                                ->label('Дължина')
+                                ->label('Length')
                                 ->numeric()
                                 ->suffix('cm')
                                 ->nullable(),
@@ -107,45 +101,45 @@ class VariantsRelationManager extends RelationManager
             ->recordTitleAttribute('size')
             ->columns([
                 TextColumn::make('size')
-                    ->label('Тип/Размер')
+                    ->label('Type / size')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('price')
-                    ->label('Цена')
+                    ->label('Price')
                     ->money('EUR')
                     ->placeholder('-')
                     ->sortable(),
                 TextColumn::make('sale_price')
-                    ->label('Цена с отстъпка')
+                    ->label('Sale price')
                     ->money('EUR')
                     ->visible(fn ($record): bool => filled($record?->sale_price))
                     ->sortable(),
                 IconColumn::make('stock')
-                    ->label('Наличност')
+                    ->label('In stock')
                     ->boolean(),
                 TextColumn::make('quantity')
-                    ->label('Количество')
+                    ->label('Quantity')
                     ->sortable(),
                 TextColumn::make('weight')
-                    ->label('Тегло')
+                    ->label('Weight')
                     ->suffix(' kg')
                     ->visible(fn ($record): bool => filled($record?->weight))
                     ->sortable(),
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('Създай вариант'),
+                    ->label('Create variant'),
             ])
             ->recordActions([
                 EditAction::make()
-                    ->label('Редактирай'),
+                    ->label('Edit'),
                 DeleteAction::make()
-                    ->label('Изтрий'),
+                    ->label('Delete'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->label('Изтрий избраните'),
+                        ->label('Delete selected'),
                 ]),
             ]);
     }

@@ -20,13 +20,6 @@ class ProductForm
                     ->label('Име')
                     ->required(),
 
-                Grid::make(2)->schema([
-                    TextInput::make('name_en')
-                        ->label('Име (EN)'),
-                    TextInput::make('name_de')
-                        ->label('Име (DE)'),
-                ]),
-
                 Select::make('category_id')
                     ->label('Категории')
                     ->relationship('categories', 'name')
@@ -44,14 +37,7 @@ class ProductForm
                     ->label('Описание')
                     ->columnSpanFull(),
 
-                Grid::make(2)->schema([
-                    RichEditor::make('description_en')
-                        ->label('Описание (EN)'),
-                    RichEditor::make('description_de')
-                        ->label('Описание (DE)'),
-                ])->columnSpanFull(),
-
-                Section::make('Цени, тегло, размери и наличност')
+                Section::make('Параметри')
                     ->schema([
                         Grid::make(3)->schema([
                             TextInput::make('price')
@@ -59,27 +45,27 @@ class ProductForm
                                 ->numeric()
                                 ->prefix('EUR '),
                             TextInput::make('sale_price')
-                                ->label('Цена с отстъпка')
+                                ->label('Промо цена')
                                 ->numeric()
                                 ->prefix('EUR '),
                             TextInput::make('weight')
-                                ->label('Тегло (кг)')
+                                ->label('Тегло (kg)')
                                 ->numeric()
                                 ->default(0)
-                                ->suffix('кг'),
+                                ->suffix('kg'),
                         ]),
 
                         Grid::make(3)->schema([
                             TextInput::make('height')
-                                ->label('Височина (см)')
+                                ->label('Височина (cm)')
                                 ->numeric()
                                 ->minValue(0.01),
                             TextInput::make('width')
-                                ->label('Ширина (см)')
+                                ->label('Широчина (cm)')
                                 ->numeric()
                                 ->minValue(0.01),
                             TextInput::make('length')
-                                ->label('Дължина (см)')
+                                ->label('Дължина (cm)')
                                 ->numeric()
                                 ->minValue(0.01),
                         ]),
@@ -97,13 +83,6 @@ class ProductForm
                 RichEditor::make('extra_information')
                     ->label('Допълнителна информация')
                     ->columnSpanFull(),
-
-                Grid::make(2)->schema([
-                    RichEditor::make('extra_information_en')
-                        ->label('Допълнителна информация (EN)'),
-                    RichEditor::make('extra_information_de')
-                        ->label('Допълнителна информация (DE)'),
-                ])->columnSpanFull(),
             ]);
     }
 }

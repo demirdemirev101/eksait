@@ -16,6 +16,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
@@ -41,67 +42,50 @@ class HomeBannerResource extends Resource
     {
         return $schema
             ->components([
-                Grid::make(2)->schema([
-                    Toggle::make('is_active')
-                        ->label('Активен')
-                        ->default(true),
-                    TextInput::make('sort_order')
-                        ->label('Ред на показване')
-                        ->numeric()
-                        ->default(fn (): int => ((int) HomeBanner::query()->max('sort_order')) + 1)
-                        ->minValue(1)
-                        ->required(),
-                    TextInput::make('eyebrow')
-                        ->label('Надзаглавие')
-                        ->maxLength(255),
-                    TextInput::make('eyebrow_en')
-                        ->label('Надзаглавие (EN)')
-                        ->maxLength(255),
-                    TextInput::make('eyebrow_de')
-                        ->label('Надзаглавие (DE)')
-                        ->maxLength(255),
-                    TextInput::make('title')
-                        ->label('Заглавие')
-                        ->required()
-                        ->maxLength(255),
-                    TextInput::make('title_en')
-                        ->label('Заглавие (EN)')
-                        ->maxLength(255),
-                    TextInput::make('title_de')
-                        ->label('Заглавие (DE)')
-                        ->maxLength(255),
-                    Textarea::make('subtitle')
-                        ->label('Подзаглавие')
-                        ->rows(3)
-                        ->columnSpanFull(),
-                    Textarea::make('subtitle_en')
-                        ->label('Подзаглавие (EN)')
-                        ->rows(3)
-                        ->columnSpanFull(),
-                    Textarea::make('subtitle_de')
-                        ->label('Подзаглавие (DE)')
-                        ->rows(3)
-                        ->columnSpanFull(),
-                    TextInput::make('button_text')
-                        ->label('Текст на бутона')
-                        ->maxLength(255),
-                    TextInput::make('button_text_en')
-                        ->label('Текст на бутона (EN)')
-                        ->maxLength(255),
-                    TextInput::make('button_text_de')
-                        ->label('Текст на бутона (DE)')
-                        ->maxLength(255),
-                    TextInput::make('button_url')
-                        ->label('Линк на бутона')
-                        ->maxLength(255),
-                    FileUpload::make('image')
-                        ->label('Изображение')
-                        ->image()
-                        ->disk('public')
-                        ->directory('banners')
-                        ->visibility('public')
-                        ->columnSpanFull(),
-                ]),
+                Section::make('Основни данни')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Toggle::make('is_active')
+                                ->label('Активен')
+                                ->default(true),
+                            TextInput::make('sort_order')
+                                ->label('Ред на показване')
+                                ->numeric()
+                                ->default(fn (): int => ((int) HomeBanner::query()->max('sort_order')) + 1)
+                                ->minValue(1)
+                                ->required(),
+                        ]),
+                        Grid::make(2)->schema([
+                            TextInput::make('eyebrow')
+                                ->label('Надзаглавие')
+                                ->maxLength(255),
+                            TextInput::make('title')
+                                ->label('Заглавие')
+                                ->required()
+                                ->maxLength(255),
+                        ]),
+                        Textarea::make('subtitle')
+                            ->label('Подзаглавие')
+                            ->rows(4)
+                            ->columnSpanFull(),
+                        TextInput::make('button_text')
+                            ->label('Текст на бутона')
+                            ->maxLength(255)
+                            ->helperText('Линкът към продуктите е фиксиран.')
+                            ->columnSpanFull(),
+                    ])
+                    ->columnSpanFull(),
+                Section::make('Изображение')
+                    ->schema([
+                        FileUpload::make('image')
+                            ->label('Изображение')
+                            ->image()
+                            ->disk('public')
+                            ->directory('banners')
+                            ->visibility('public')
+                            ->columnSpanFull(),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 

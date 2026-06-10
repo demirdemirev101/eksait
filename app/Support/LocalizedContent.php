@@ -2,7 +2,9 @@
 
 namespace App\Support;
 
+use App\Services\CatalogTermTranslator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class LocalizedContent
 {
@@ -18,7 +20,28 @@ class LocalizedContent
 
     public static function requestedLocale(?Request $request = null): string
     {
-        return self::normalizeLocale($request?->query('lang'));
+        $candidates = [
+            $request?->query('lang'),
+            $request?->query('locale'),
+            $request?->header('X-Locale'),
+            $request?->header('X-Language'),
+            self::localeFromAcceptLanguage($request),
+            app()->getLocale(),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            $normalized = self::normalizeLocale($candidate);
+
+            if (in_array($normalized, self::supportedLocales(), true)) {
+                return $normalized;
+            }
+        }
+
+        return self::DEFAULT_LOCALE;
     }
 
     public static function normalizeLocale(mixed $locale): string
@@ -33,18 +56,23 @@ class LocalizedContent
     public static function localizedValue(object|array $source, string $field, string $locale): mixed
     {
         $locale = self::normalizeLocale($locale);
+        $baseValue = self::rawValue($source, $field);
 
         if ($locale === self::DEFAULT_LOCALE) {
-            return self::rawValue($source, $field);
+            return $baseValue;
         }
 
-        $translatedValue = self::rawValue($source, "{$field}_{$locale}");
+        $effectiveLocale = self::effectiveLocaleForField($field, $locale);
+        $translatedValue = self::rawValue($source, "{$field}_{$effectiveLocale}");
 
         if (self::hasContent($translatedValue)) {
-            return $translatedValue;
+            return self::formatLocalizedValue($field, $translatedValue);
         }
 
-        return self::rawValue($source, $field);
+        $localized = app(CatalogTermTranslator::class)
+            ->translate($baseValue, $effectiveLocale, self::DEFAULT_LOCALE);
+
+        return self::formatLocalizedValue($field, $localized);
     }
 
     public static function rawValue(object|array $source, string $field): mixed
@@ -66,9 +94,7 @@ class LocalizedContent
 
         foreach (self::supportedLocales() as $locale) {
             foreach ($fields as $field) {
-                $translations[$locale][$field] = $locale === self::DEFAULT_LOCALE
-                    ? self::rawValue($source, $field)
-                    : self::rawValue($source, "{$field}_{$locale}");
+                $translations[$locale][$field] = self::localizedValue($source, $field, $locale);
             }
         }
 
@@ -82,5 +108,47 @@ class LocalizedContent
         }
 
         return $value !== null;
+    }
+
+    private static function localeFromAcceptLanguage(?Request $request): ?string
+    {
+        $header = (string) $request?->header('Accept-Language', '');
+
+        if ($header === '') {
+            return null;
+        }
+
+        foreach (explode(',', $header) as $part) {
+            $locale = Str::of($part)->before(';')->trim()->lower()->value();
+            $primary = Str::of($locale)->before('-')->value();
+
+            if (in_array($primary, self::supportedLocales(), true)) {
+                return $primary;
+            }
+        }
+
+        return null;
+    }
+
+    private static function formatLocalizedValue(string $field, mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        if (in_array($field, ['name', 'size'], true)) {
+            return Str::upper(trim($value));
+        }
+
+        return $value;
+    }
+
+    private static function effectiveLocaleForField(string $field, string $locale): string
+    {
+        if ($locale === 'de' && in_array($field, ['name', 'size'], true)) {
+            return 'en';
+        }
+
+        return $locale;
     }
 }

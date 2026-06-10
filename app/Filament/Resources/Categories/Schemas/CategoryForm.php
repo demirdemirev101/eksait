@@ -13,20 +13,16 @@ class CategoryForm
         return $schema
             ->components([
                 TextInput::make('name')
-                    ->label('Име')
+                    ->label('Name')
                     ->required(),
-                TextInput::make('name_en')
-                    ->label('Име (EN)'),
-                TextInput::make('name_de')
-                    ->label('Име (DE)'),
                 TextInput::make('slug')
-                    ->label('Кратък адрес')
+                    ->label('Slug')
                     ->dehydrated()
                     ->hidden()
                     ->disabled()
                     ->required(),
                 Select::make('parent_id')
-                    ->label('Родителска категория')
+                    ->label('Parent category')
                     ->relationship('parent', 'name')
                     ->searchable()
                     ->preload()
