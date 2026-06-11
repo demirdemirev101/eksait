@@ -19,6 +19,7 @@ use App\Services\StripeCheckoutService;
 use App\Support\CartSessionToken;
 use App\Support\LocalizedContent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -117,25 +118,48 @@ class CheckoutController extends Controller
     /**
      * Normalize raw Econt office payloads into a stable frontend-friendly shape.
      */
-    private function normalizeEcontOffice(array $office): array
+    private function normalizeEcontOffice(array $office, string $locale = 'bg'): array
     {
+        $locale = LocalizedContent::normalizeLocale($locale);
         $code = $office['code']
             ?? $office['officeCode']
             ?? $office['office_code']
             ?? $office['id']
             ?? null;
 
-        $name = $office['name']
-            ?? $office['officeName']
-            ?? $office['office_name']
-            ?? $office['fullName']
-            ?? null;
+        $name = $locale === 'bg'
+            ? ($office['name']
+                ?? $office['officeName']
+                ?? $office['office_name']
+                ?? $office['fullName']
+                ?? null)
+            : ($office['nameEn']
+                ?? $office['officeNameEn']
+                ?? $office['fullNameEn']
+                ?? $office['name']
+                ?? $office['officeName']
+                ?? $office['office_name']
+                ?? $office['fullName']
+                ?? null);
 
-        $city = $office['city']
-            ?? $office['cityName']
-            ?? data_get($office, 'address.city.name')
-            ?? data_get($office, 'address.cityName')
-            ?? null;
+        $city = $locale === 'bg'
+            ? ($office['city']
+                ?? $office['cityName']
+                ?? data_get($office, 'address.city.name')
+                ?? data_get($office, 'address.cityName')
+                ?? $office['hubName']
+                ?? null)
+            : ($office['cityEn']
+                ?? $office['cityNameEn']
+                ?? data_get($office, 'address.city.nameEn')
+                ?? data_get($office, 'address.cityNameEn')
+                ?? $office['hubNameEn']
+                ?? $office['city']
+                ?? $office['cityName']
+                ?? data_get($office, 'address.city.name')
+                ?? data_get($office, 'address.cityName')
+                ?? $office['hubName']
+                ?? null);
 
         $address = $office['address']
             ?? $office['fullAddress']
@@ -144,14 +168,9 @@ class CheckoutController extends Controller
             ?? null;
 
         if (is_array($address)) {
-            $address = $address['fullAddress']
-                ?? $address['addressLine']
-                ?? $address['streetAddress']
-                ?? trim(implode(' ', array_filter([
-                    $address['street'] ?? null,
-                    $address['num'] ?? null,
-                    $address['quarter'] ?? null,
-                ])));
+            $address = $this->formatOfficeAddress($address, $locale);
+        } elseif ($locale !== 'bg' && is_string($address)) {
+            $address = $this->transliterateToLatin($address);
         }
 
         return [
@@ -163,7 +182,65 @@ class CheckoutController extends Controller
         ];
     }
 
-    private function enrichSelectedOffice(array $validated, EcontCityResolverService $econtCityResolverService): array
+    private function formatOfficeAddress(array $address, string $locale): ?string
+    {
+        if ($locale === 'bg') {
+            $formatted = $address['fullAddress']
+                ?? $address['addressLine']
+                ?? $address['streetAddress']
+                ?? trim(implode(' ', array_filter([
+                    $address['street'] ?? null,
+                    $address['num'] ?? null,
+                    $address['quarter'] ?? null,
+                ])));
+
+            return is_string($formatted) && trim($formatted) !== '' ? trim($formatted) : null;
+        }
+
+        $city = data_get($address, 'city.nameEn')
+            ?? data_get($address, 'cityNameEn')
+            ?? data_get($address, 'city.name')
+            ?? data_get($address, 'cityName')
+            ?? null;
+
+        $parts = array_filter([
+            $city,
+            $address['quarter'] ?? null,
+            $address['street'] ?? null,
+            $address['num'] ?? null ? 'No. '.$address['num'] : null,
+        ], fn ($part) => is_string($part) ? trim($part) !== '' : $part !== null);
+
+        if ($parts !== []) {
+            return $this->transliterateToLatin(implode(' ', $parts));
+        }
+
+        $formatted = $address['fullAddress']
+            ?? $address['addressLine']
+            ?? $address['streetAddress']
+            ?? null;
+
+        return is_string($formatted) && trim($formatted) !== ''
+            ? $this->transliterateToLatin($formatted)
+            : null;
+    }
+
+    private function transliterateToLatin(string $value): string
+    {
+        $normalized = str_replace('№', 'No. ', $value);
+        $normalized = Str::of($normalized)
+            ->ascii()
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->value();
+
+        return $normalized;
+    }
+
+    private function enrichSelectedOffice(
+        array $validated,
+        EcontCityResolverService $econtCityResolverService,
+        string $locale = 'bg'
+    ): array
     {
         if (($validated['shipping_method'] ?? null) === 'address') {
             $validated['econt_office_code'] = null;
@@ -186,11 +263,11 @@ class CheckoutController extends Controller
             return $validated;
         }
 
-        $normalizedOffice = $this->normalizeEcontOffice($office);
+        $normalizedOffice = $this->normalizeEcontOffice($office, $locale);
 
         $validated['econt_office_code'] = $normalizedOffice['code'] ?? $validated['econt_office_code'];
-        $validated['econt_office_name'] = $validated['econt_office_name'] ?? $normalizedOffice['name'];
-        $validated['econt_office_address'] = $validated['econt_office_address'] ?? $normalizedOffice['address'];
+        $validated['econt_office_name'] = $normalizedOffice['name'] ?? $validated['econt_office_name'];
+        $validated['econt_office_address'] = $normalizedOffice['address'] ?? $validated['econt_office_address'];
         $validated['econt_office_is_aps'] = (bool) ($validated['econt_office_is_aps'] ?? $normalizedOffice['is_aps'] ?? false);
 
         if (($validated['shipping_method'] ?? null) !== 'apm' && $validated['econt_office_is_aps']) {
@@ -207,11 +284,12 @@ class CheckoutController extends Controller
     {
         $validated = $request->validated();
         $city = trim($validated['city']);
+        $locale = LocalizedContent::requestedLocale($request);
 
         try {
             $offices = collect($econtCityResolverService->getOffices($city))
                 ->filter(fn ($office) => is_array($office))
-                ->map(fn (array $office) => $this->normalizeEcontOffice($office))
+                ->map(fn (array $office) => $this->normalizeEcontOffice($office, $locale))
                 ->filter(fn (array $office) => ! empty($office['code']) && ! empty($office['name']))
                 ->values();
         } catch (\Throwable $e) {
@@ -242,7 +320,11 @@ class CheckoutController extends Controller
         SettingsService $settingsService,
         EcontCityResolverService $econtCityResolverService
     ) {
-        $validated = $this->enrichSelectedOffice($request->validated(), $econtCityResolverService);
+        $validated = $this->enrichSelectedOffice(
+            $request->validated(),
+            $econtCityResolverService,
+            LocalizedContent::requestedLocale($request)
+        );
 
         $cartService = $this->getCartService($request);
         $requestedSessionId = $this->frontendCartSessionId($request);
@@ -336,8 +418,13 @@ class CheckoutController extends Controller
         OrderService $orderService,
         EcontCityResolverService $econtCityResolverService
     ) {
-        $validated = $this->enrichSelectedOffice($request->validated(), $econtCityResolverService);
-        $validated['locale'] = LocalizedContent::requestedLocale($request);
+        $locale = LocalizedContent::requestedLocale($request);
+        $validated = $this->enrichSelectedOffice(
+            $request->validated(),
+            $econtCityResolverService,
+            $locale
+        );
+        $validated['locale'] = $locale;
         $validated['session_id'] = $this->frontendCartSessionId($request);
 
         try {

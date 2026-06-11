@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class OrderItem extends Model
 {
@@ -39,6 +40,30 @@ class OrderItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function getSnapshotProductNameAttribute(): string
+    {
+        $productName = (string) ($this->product_name ?? '');
+
+        if (! $this->product_variant_id || $productName === '') {
+            return $productName;
+        }
+
+        return Str::beforeLast($productName, ' - ');
+    }
+
+    public function getSnapshotVariantNameAttribute(): ?string
+    {
+        $productName = (string) ($this->product_name ?? '');
+
+        if (! $this->product_variant_id || $productName === '' || ! str_contains($productName, ' - ')) {
+            return null;
+        }
+
+        $variantName = Str::afterLast($productName, ' - ');
+
+        return $variantName !== '' ? $variantName : null;
     }
 
 }

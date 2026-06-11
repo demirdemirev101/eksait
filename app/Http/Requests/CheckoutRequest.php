@@ -12,6 +12,11 @@ class CheckoutRequest extends FormRequest
 {
     use HasCheckoutShippingRules;
 
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeCheckoutOptionValues();
+    }
+
     public function authorize(): bool
     {
         return true;

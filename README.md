@@ -1,12 +1,13 @@
 # Eksait
 
-Eksait is a Laravel e-commerce backend with a JSON API, Filament admin panel, cart and checkout flows, product variants, Econt delivery integration, Stripe card payments, and Bulgarian localization.
+Eksait is a Laravel e-commerce backend with a JSON API, Filament admin panel, cart and checkout flows, product variants, Econt delivery integration, Stripe card payments, and multilingual catalog and checkout support.
 
 ## Features
 
 - Product catalog with categories, images, related products, variants, stock state, dimensions, and weights.
 - Guest and authenticated carts with session-based cart recovery and merge-on-login behavior.
 - Checkout flow with bank transfer, cash on delivery, and optional Stripe payment sessions.
+- Locale-aware checkout with Bulgarian, English, and German support across product payloads, payment method labels, Stripe checkout locale, and customer order emails.
 - Econt shipping support for address, office, and automatic post station delivery.
 - Stripe-aware order cancellation and return flows in Filament, including Econt label deletion and refund handling.
 - Order, shipment, settings, product, category, banner, message, user, and sales management through Filament.
@@ -126,6 +127,14 @@ SEED_ADMIN_PHONE=
 
 Set `FRONTEND_URL` to the URL of the React or storefront client that consumes this API. Stripe checkout success and cancel URLs are built from this value.
 
+Supported storefront locales are:
+
+- `bg`
+- `en`
+- `de`
+
+If no supported locale is provided, the API falls back to `bg`.
+
 For Econt sender configuration:
 
 - Use `ECONT_SENDER_OFFICE` for office-based sending.
@@ -226,6 +235,16 @@ POST   /api/logout
 GET    /api/orders
 ```
 
+Catalog and checkout endpoints can resolve locale from:
+
+- `lang` query parameter
+- `locale` query parameter
+- `X-Locale` header
+- `X-Language` header
+- `Accept-Language` header
+
+Product and banner endpoints return localized catalog fields based on that resolved locale. Checkout also persists the resolved locale on the order record.
+
 For guest cart continuity, send the same session id in one of these places:
 
 - `session_id` request body field
@@ -255,6 +274,14 @@ Frontend guidance:
 5. Submit the order with `POST /api/checkout`.
 6. If the selected payment method is `stripe`, redirect the customer to the returned `checkout_url`.
 7. Stripe webhook updates the order payment state after payment events.
+
+Locale notes:
+
+- The frontend should keep sending the active storefront locale during checkout, preferably through `?lang=...`, `?locale=...`, or `X-Locale`.
+- Each order stores its resolved locale in `orders.locale`.
+- Order items snapshot localized product and variant names at order creation time, so later catalog translation changes do not rewrite old orders.
+- Customer-facing emails and Stripe Checkout use the order locale.
+- Customer-entered fields like name, address, city, phone, and notes are stored as entered and are not translated by the backend.
 
 Admin-side order handling:
 
@@ -329,6 +356,7 @@ app/Services/Econt       Econt API adapter and payload mapping
 app/Jobs                 Queue jobs
 app/Listeners            Event listeners
 database/migrations      Database schema
+lang                     Application translation files
 resources/views/emails   Mail templates
 routes/api.php           JSON API routes
 tests/Feature            Feature tests

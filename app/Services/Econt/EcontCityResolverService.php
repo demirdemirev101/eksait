@@ -38,7 +38,7 @@ class EcontCityResolverService
             if ($normalizedPostCode) {
                 foreach ($cities as $city) {
                     if (
-                        mb_strtolower($city['name']) === $normalizedName &&
+                        $this->cityMatchesNormalizedName($city, $normalizedName) &&
                         isset($city['postCode']) &&
                         $city['postCode'] === $normalizedPostCode
                     ) {
@@ -49,7 +49,7 @@ class EcontCityResolverService
 
             foreach ($cities as $city) {
                 if (
-                    mb_strtolower($city['name']) === $normalizedName &&
+                    $this->cityMatchesNormalizedName($city, $normalizedName) &&
                     ! empty($city['regionName'])
                 ) {
                     return (int) $city['id'];
@@ -58,7 +58,7 @@ class EcontCityResolverService
 
             foreach ($cities as $city) {
                 if (
-                    mb_strtolower($city['name']) === $normalizedName &&
+                    $this->cityMatchesNormalizedName($city, $normalizedName) &&
                     ($city['expressCityDeliveries'] ?? false)
                 ) {
                     return (int) $city['id'];
@@ -95,11 +95,22 @@ class EcontCityResolverService
             return $cached;
         }
 
+        $cityId = $this->resolveCityIdForOfficeLookup($cityName);
+
         try {
-            $cityId = $this->getCityId($cityName);
-            $offices = $cityId !== null
-                ? $this->fetchOfficesByCityId($cityId, $normalizedCityName)
-                : [];
+            $offices = [];
+
+            if ($cityId !== null) {
+                try {
+                    $offices = $this->fetchOfficesByCityId($cityId, $normalizedCityName);
+                } catch (\Throwable $e) {
+                    Log::warning('Econt city-specific office lookup failed, falling back to all offices', [
+                        'city' => $cityName,
+                        'city_id' => $cityId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             if ($offices === []) {
                 $offices = $this->fetchAndFilterAllOffices($normalizedCityName);
@@ -127,6 +138,20 @@ class EcontCityResolverService
             ]);
 
             return [];
+        }
+    }
+
+    private function resolveCityIdForOfficeLookup(string $cityName): ?int
+    {
+        try {
+            return $this->getCityId($cityName);
+        } catch (\Throwable $e) {
+            Log::warning('Econt city id lookup failed, falling back to office list filtering', [
+                'city' => $cityName,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 
@@ -217,9 +242,34 @@ class EcontCityResolverService
     {
         $candidates = [
             $office['cityName'] ?? null,
+            $office['cityNameEn'] ?? null,
             $office['city'] ?? null,
             data_get($office, 'address.city.name'),
+            data_get($office, 'address.city.nameEn'),
             data_get($office, 'address.cityName'),
+            data_get($office, 'address.cityNameEn'),
+            $office['hubName'] ?? null,
+            $office['hubNameEn'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            if ($this->normalizeCityName($candidate) === $normalizedCityName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function cityMatchesNormalizedName(array $city, string $normalizedCityName): bool
+    {
+        $candidates = [
+            $city['name'] ?? null,
+            $city['nameEn'] ?? null,
         ];
 
         foreach ($candidates as $candidate) {

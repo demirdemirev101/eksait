@@ -79,4 +79,34 @@ class SettingsServiceTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['payment_method']);
     }
+
+    public function test_calculate_shipping_accepts_english_payment_method_label(): void
+    {
+        $response = $this->postJson('/api/checkout/calculate-shipping', [
+            'shipping_method' => 'address',
+            'shipping_address' => 'Test street 1',
+            'shipping_city' => 'Sofia',
+            'shipping_postcode' => '1000',
+            'payment_method' => 'Cash on delivery',
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonMissingValidationErrors(['payment_method']);
+    }
+
+    public function test_calculate_shipping_accepts_german_payment_method_label(): void
+    {
+        $response = $this->postJson('/api/checkout/calculate-shipping', [
+            'shipping_method' => 'address',
+            'shipping_address' => 'Test street 1',
+            'shipping_city' => 'Sofia',
+            'shipping_postcode' => '1000',
+            'payment_method' => 'Nachnahme',
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonMissingValidationErrors(['payment_method']);
+    }
 }

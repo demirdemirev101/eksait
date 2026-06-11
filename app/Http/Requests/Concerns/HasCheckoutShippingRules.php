@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Concerns;
 
+use Illuminate\Support\Str;
+
 trait HasCheckoutShippingRules
 {
     protected function checkoutShippingRules(): array
@@ -22,5 +24,78 @@ trait HasCheckoutShippingRules
             'session_id' => ['sometimes', 'string', 'min:16', 'max:128', 'regex:/\A[A-Za-z0-9_-]+\z/'],
             'sessionId' => ['sometimes', 'string', 'min:16', 'max:128', 'regex:/\A[A-Za-z0-9_-]+\z/'],
         ];
+    }
+
+    protected function normalizeCheckoutOptionValues(): void
+    {
+        $this->merge([
+            'payment_method' => $this->normalizePaymentMethod($this->input('payment_method')),
+            'shipping_method' => $this->normalizeShippingMethod($this->input('shipping_method')),
+        ]);
+    }
+
+    private function normalizePaymentMethod(mixed $value): mixed
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return $value;
+        }
+
+        $normalized = $this->normalizeOptionKey($value);
+
+        return match ($normalized) {
+            'banktransfer',
+            'bankovprevod',
+            'uberweisung',
+            'bankuberweisung' => 'bank_transfer',
+            'cashondelivery',
+            'cashdelivery',
+            'cod',
+            'nalozhenplatezh',
+            'nachnahme' => 'cod',
+            'card',
+            'stripe',
+            'kart',
+            'karte' => 'stripe',
+            default => $value,
+        };
+    }
+
+    private function normalizeShippingMethod(mixed $value): mixed
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return $value;
+        }
+
+        $normalized = $this->normalizeOptionKey($value);
+
+        return match ($normalized) {
+            'address',
+            'toaddress',
+            'addreszadosavka',
+            'lieferadresse' => 'address',
+            'office',
+            'tooffice',
+            'doofis',
+            'pickupoffice',
+            'abholstelle' => 'office',
+            'apm',
+            'parcellocker',
+            'econtomat',
+            'ekontomat',
+            'automat',
+            'paketautomat' => 'apm',
+            default => $value,
+        };
+    }
+
+    private function normalizeOptionKey(string $value): string
+    {
+        $ascii = Str::of($value)
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', '')
+            ->value();
+
+        return $ascii;
     }
 }

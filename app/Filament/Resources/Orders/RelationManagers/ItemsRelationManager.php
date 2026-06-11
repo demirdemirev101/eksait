@@ -101,12 +101,12 @@ class ItemsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('product_name')
             ->columns([
-                TextColumn::make('product_name')
+                TextColumn::make('snapshot_product_name')
                     ->label('Продукт')
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('variant.size')
+                TextColumn::make('snapshot_variant_name')
                     ->label('Вариант')
                     ->placeholder('-'),
 
