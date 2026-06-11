@@ -3,25 +3,35 @@
 namespace App\Http\Controllers;
 
 use App\Models\HomeBanner;
+use App\Support\LocalizedContent;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class HomeBannerController extends Controller
 {
-    public function show(): JsonResponse
+    public function show(Request $request): JsonResponse
     {
+        $locale = LocalizedContent::requestedLocale($request);
+
         $items = HomeBanner::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->map(function (HomeBanner $banner): array {
+            ->map(function (HomeBanner $banner) use ($locale): array {
                 return [
                     'id' => $banner->id,
-                    'eyebrow' => $banner->eyebrow,
-                    'title' => $banner->title,
-                    'subtitle' => $banner->subtitle,
-                    'button_text' => $banner->button_text,
+                    'eyebrow' => LocalizedContent::localizedValue($banner, 'eyebrow', $locale),
+                    'title' => LocalizedContent::localizedValue($banner, 'title', $locale),
+                    'subtitle' => LocalizedContent::localizedValue($banner, 'subtitle', $locale),
+                    'button_text' => LocalizedContent::localizedValue($banner, 'button_text', $locale),
+                    'translations' => LocalizedContent::translations($banner, [
+                        'eyebrow',
+                        'title',
+                        'subtitle',
+                        'button_text',
+                    ]),
                     'button_url' => '/products',
                     'image' => $banner->image,
                     'image_url' => $banner->image ? Storage::disk('public')->url($banner->image) : null,

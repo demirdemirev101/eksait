@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Shipment;
+use App\Support\LocalizedContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -17,11 +18,14 @@ class ShipmentTrackingMail extends Mailable
     {
         $shipment = Shipment::with('order')->find($this->shipmentId);
         $isReturnShipment = ($shipment?->direction ?? 'outbound') === 'return';
+        $locale = LocalizedContent::normalizeLocale($shipment?->order?->locale ?? null);
+        $subjectKey = $isReturnShipment
+            ? 'orders.mail.tracking.subject_return'
+            : 'orders.mail.tracking.subject_outbound';
 
         return $this
-            ->subject($isReturnShipment
-                ? 'Инструкции за връщане на поръчка #' . ($shipment?->order?->id ?? '')
-                : 'Вашата поръчка е изпратена')
+            ->locale($locale)
+            ->subject(trans($subjectKey, ['order' => $shipment?->order?->id], $locale))
             ->view('emails.shipment.tracking', [
                 'shipment' => $shipment,
                 'trackingNumber' => $shipment?->tracking_number,

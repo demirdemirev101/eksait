@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CheckoutException;
-use App\Http\Controllers\Controller;
 use App\Http\Requests\CalculateShippingRequest;
 use App\Http\Requests\CheckoutRequest;
 use App\Http\Requests\EcontOfficesRequest;
@@ -18,6 +17,7 @@ use App\Services\OrderService;
 use App\Services\SettingsService;
 use App\Services\StripeCheckoutService;
 use App\Support\CartSessionToken;
+use App\Support\LocalizedContent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -25,24 +25,25 @@ use Illuminate\Support\Facades\Log;
 
 class CheckoutController extends Controller
 {
-    public function paymentMethods()
+    public function paymentMethods(Request $request)
     {
+        $locale = LocalizedContent::requestedLocale($request);
         $settings = Setting::current();
         $methods = [
             [
                 'value' => 'bank_transfer',
-                'label' => 'Банков превод',
+                'label' => trans('orders.payment_methods.bank_transfer', [], $locale),
             ],
             [
                 'value' => 'cod',
-                'label' => 'Наложен платеж',
+                'label' => trans('orders.payment_methods.cod', [], $locale),
             ],
         ];
 
         if ($settings->stripe_enabled) {
             $methods[] = [
                 'value' => 'stripe',
-                'label' => 'Stripe',
+                'label' => trans('orders.payment_methods.stripe', [], $locale),
             ];
         }
 
@@ -54,8 +55,8 @@ class CheckoutController extends Controller
 
     /**
      * Resolve CartService using the session_id sent by the React client.
-     * This keeps checkout pricing aligned with the cart endpoints instead of falling back to Laravel's cookie session ID.
-     * If user is authenticated, ignore session_id and use user cart.
+     * This keeps checkout pricing aligned with the cart endpoints instead of
+     * falling back to Laravel's cookie session ID.
      */
     private function getCartService(Request $request): CartService
     {
@@ -72,7 +73,8 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Build temporary order items from request payload when the React page has not synced a server cart yet.
+     * Build temporary order items from request payload when the React page has
+     * not synced a server cart yet.
      */
     private function buildItemsFromRequest(array $items): Collection
     {
@@ -80,6 +82,7 @@ class CheckoutController extends Controller
             ->whereIn('id', collect($items)->pluck('product_id')->all())
             ->get()
             ->keyBy('id');
+
         $variants = ProductVariant::query()
             ->whereIn('id', collect($items)
                 ->map(fn (array $item) => $item['product_variant_id'] ?? $item['variant_id'] ?? null)
@@ -103,6 +106,7 @@ class CheckoutController extends Controller
                 'quantity' => $quantity,
                 'total' => $price * $quantity,
             ]);
+
             $orderItem->setRelation('product', $product);
             $orderItem->setRelation('variant', $variant);
 
@@ -202,8 +206,8 @@ class CheckoutController extends Controller
     public function econtOffices(EcontOfficesRequest $request, EcontCityResolverService $econtCityResolverService)
     {
         $validated = $request->validated();
-
         $city = trim($validated['city']);
+
         try {
             $offices = collect($econtCityResolverService->getOffices($city))
                 ->filter(fn ($office) => is_array($office))
@@ -237,8 +241,7 @@ class CheckoutController extends Controller
         CalculateShippingRequest $request,
         SettingsService $settingsService,
         EcontCityResolverService $econtCityResolverService
-    )
-    {
+    ) {
         $validated = $this->enrichSelectedOffice($request->validated(), $econtCityResolverService);
 
         $cartService = $this->getCartService($request);
@@ -277,6 +280,7 @@ class CheckoutController extends Controller
                 : (bool) ($validated['econt_office_is_aps'] ?? false),
             'payment_method' => $validated['payment_method'] ?? null,
         ]);
+
         $tempOrder->setRelation('items', $effectiveItems);
 
         if ($effectiveItems->isEmpty()) {
@@ -295,8 +299,6 @@ class CheckoutController extends Controller
         }
 
         try {
-            // Use a live estimate here so the checkout UI can show Econt pricing
-            // even for payment methods that are deferred in the final order flow.
             $tempOrder->shipping_price = $settingsService->estimateShipping($tempOrder);
         } catch (CheckoutException $e) {
             return response()->json([
@@ -323,20 +325,19 @@ class CheckoutController extends Controller
             'shipping_price' => $tempOrder->shipping_price ?? 0.0,
         ]);
     }
+
     /**
-     * Process the checkout by validating the request data and creating an order using the OrderService.
-      * @param \Illuminate\Http\Request $request
-      * @param \App\Services\OrderService $orderService
-      * @return \Illuminate\Http\JsonResponse
-      * @throws \App\Exceptions\CheckoutException
+     * Process the checkout by validating the request data and creating an order.
+     *
+     * @throws CheckoutException
      */
     public function store(
         CheckoutRequest $request,
         OrderService $orderService,
         EcontCityResolverService $econtCityResolverService
-    ) 
-    {
+    ) {
         $validated = $this->enrichSelectedOffice($request->validated(), $econtCityResolverService);
+        $validated['locale'] = LocalizedContent::requestedLocale($request);
         $validated['session_id'] = $this->frontendCartSessionId($request);
 
         try {
@@ -345,6 +346,7 @@ class CheckoutController extends Controller
             if ($order->payment_method === 'stripe') {
                 $stripeCheckoutService = app(StripeCheckoutService::class);
                 $session = $stripeCheckoutService->createSession($order, $validated['session_id'] ?? null);
+
                 $order->updateQuietly([
                     'stripe_checkout_session_id' => $session->id,
                     'stripe_payment_intent_id' => is_string($session->payment_intent ?? null)
@@ -360,20 +362,18 @@ class CheckoutController extends Controller
             }
 
             return response()->json([
-                'success'  => true,
+                'success' => true,
                 'order_id' => $order->id,
             ]);
-
         } catch (CheckoutException $e) {
             Log::error('Checkout failed', [
                 'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], $e->status());
-
         } catch (\Exception $e) {
             Log::error('Checkout failed', [
                 'error' => $e->getMessage(),

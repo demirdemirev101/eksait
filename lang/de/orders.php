@@ -1,0 +1,93 @@
+<?php
+
+return [
+    'payment_methods' => [
+        'bank_transfer' => 'Banküberweisung',
+        'cod' => 'Nachnahme',
+        'stripe' => 'Karte',
+    ],
+    'stripe' => [
+        'shipping' => 'Versand',
+    ],
+    'errors' => [
+        'stripe_disabled' => 'Stripe-Zahlungen sind derzeit deaktiviert.',
+        'invalid_variant' => 'Ungültige Variante für Produkt: :product',
+        'variant_required' => 'Bitte wählen Sie eine Variante für das Produkt: :product',
+    ],
+    'mail' => [
+        'common' => [
+            'product' => 'Produkt',
+            'amount' => 'Betrag',
+            'products' => 'Produkte',
+            'shipping' => 'Versand',
+            'total' => 'Gesamt',
+            'ordered_products' => 'Bestellte Produkte',
+            'quantity_price' => ':quantity Stk. x :price €',
+            'product_fallback' => 'Produkt',
+        ],
+        'footer' => [
+            'city_country' => 'Stara Zagora, Bulgarien',
+            'phone' => 'Tel',
+        ],
+        'shipping_methods' => [
+            'address' => 'Lieferadresse',
+            'office' => 'Abholstelle',
+            'apm' => 'Paketautomat',
+        ],
+        'shipping' => [
+            'phone' => 'Telefon: :phone',
+            'code' => 'Code: :code',
+            'city' => 'Stadt: :city',
+            'missing' => 'Es wurden keine Lieferdaten angegeben.',
+        ],
+        'confirmation' => [
+            'title' => 'Bestellbestätigung',
+            'subject' => 'Bestellbestätigung #:order',
+            'hero_title' => 'Vielen Dank für Ihre Bestellung, :name!',
+            'hero_text' => 'Wir haben Ihre Bestellung #:order erhalten und bearbeiten sie so schnell wie möglich.',
+            'support' => 'Wenn Sie Fragen haben oder Hilfe benötigen, kontaktieren Sie uns. Wir helfen Ihnen gern weiter.',
+            'bank_transfer' => [
+                'section' => 'Banküberweisung',
+                'title' => 'Zahlungsdaten',
+                'recipient' => 'Empfänger',
+                'bank' => 'Bank',
+                'amount' => 'Betrag',
+                'reference' => 'Verwendungszweck',
+                'reference_value' => 'Bestellung #:order',
+                'note' => 'Sobald wir den Zahlungseingang bestätigt haben, bereiten wir Ihre Sendung vor und verschicken sie.',
+            ],
+        ],
+        'cancelled' => [
+            'title' => 'Bestellung storniert',
+            'subject' => 'Stornierte Bestellung #:order',
+            'hero_title' => 'Hallo, :name.',
+            'hero_text' => 'Ihre Bestellung #:order wurde storniert.',
+            'support' => 'Wenn Sie Fragen haben, kontaktieren Sie uns. Wir helfen Ihnen gern weiter.',
+        ],
+        'return_requested' => [
+            'title' => 'Rücksendung angefordert',
+            'subject' => 'Rücksendung für Bestellung #:order angefordert',
+            'hero_title' => 'Hallo, :name.',
+            'hero_text' => 'Wir haben eine Rücksendeanfrage für Bestellung #:order erhalten.',
+            'support' => 'Sie erhalten eine separate E-Mail mit der Rücksendungsnummer und Sendungsverfolgung, sobald Econt die Anfrage bestätigt.',
+        ],
+        'tracking' => [
+            'title_outbound' => 'Sendung versendet',
+            'title_return' => 'Rücksendehinweise',
+            'subject_outbound' => 'Ihre Bestellung wurde versendet',
+            'subject_return' => 'Rücksendehinweise für Bestellung #:order',
+            'hero_outbound' => 'Ihre Sendung wurde bei Econt erstellt.',
+            'hero_return' => 'Ihre Rücksendung wurde bei Econt erstellt.',
+            'tracking_number' => 'Sendungsnummer',
+            'section_outbound' => 'Sendungsverfolgung',
+            'section_return' => 'Rücksendung',
+            'order' => 'Bestellung',
+            'open_label' => 'Label öffnen',
+            'open_return_label' => 'Rücksendeetikett öffnen',
+            'track_shipment' => 'Sendung verfolgen',
+            'track_return' => 'Rücksendung verfolgen',
+            'note_outbound' => 'Vielen Dank, dass Sie Excite Company gewählt haben.',
+            'note_return' => 'Wir haben die Rücksendung vorbereitet und Sie können die Sendungsnummer während des Rückgabeprozesses verwenden.',
+        ],
+    ],
+];

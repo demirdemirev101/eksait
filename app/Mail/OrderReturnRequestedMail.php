@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Order;
+use App\Support\LocalizedContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -20,8 +21,11 @@ class OrderReturnRequestedMail extends Mailable
 
     public function build()
     {
+        $locale = LocalizedContent::normalizeLocale($this->order->locale ?? null);
+
         return $this
-            ->subject('Заявено връщане на поръчка #' . $this->order->id)
+            ->locale($locale)
+            ->subject(trans('orders.mail.return_requested.subject', ['order' => $this->order->id], $locale))
             ->view('emails.order-return-requested')
             ->with([
                 'order' => $this->order,

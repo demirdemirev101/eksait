@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Categories\Schemas;
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class CategoryForm
@@ -12,21 +14,44 @@ class CategoryForm
     {
         return $schema
             ->components([
-                TextInput::make('name')
-                    ->label('Name')
-                    ->required(),
-                TextInput::make('slug')
-                    ->label('Slug')
-                    ->dehydrated()
-                    ->hidden()
-                    ->disabled()
-                    ->required(),
-                Select::make('parent_id')
-                    ->label('Parent category')
-                    ->relationship('parent', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->nullable(),
+                Section::make('Основни данни')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('name')
+                                ->label('Име')
+                                ->required(),
+
+                            Select::make('parent_id')
+                                ->label('Родителска категория')
+                                ->relationship('parent', 'name')
+                                ->searchable()
+                                ->preload()
+                                ->nullable(),
+                        ]),
+
+                        TextInput::make('slug')
+                            ->label('Кратък адрес')
+                            ->dehydrated()
+                            ->hidden()
+                            ->disabled()
+                            ->required(),
+                    ])
+                    ->columnSpanFull(),
+
+                Section::make('Преводи')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('name_en')
+                                ->label('Име на английски')
+                                ->required(),
+
+                            TextInput::make('name_de')
+                                ->label('Име на немски')
+                                ->required(),
+                        ]),
+                    ])
+                    ->collapsible()
+                    ->columnSpanFull(),
             ]);
     }
 }

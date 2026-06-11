@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bg">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,8 +55,8 @@
 
             <div class="footer">
                 <strong>Excite Company</strong>
-                гр. Стара Загора, България<br>
-                Тел: 0988 335 555 &nbsp;·&nbsp;
+                {{ __('orders.mail.footer.city_country') }}<br>
+                {{ __('orders.mail.footer.phone') }}: 0988 335 555 &nbsp;·&nbsp;
                 <a href="mailto:info@excitecompany.bg">info@excitecompany.bg</a>
             </div>
         </div>

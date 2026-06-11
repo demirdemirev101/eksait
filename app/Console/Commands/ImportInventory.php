@@ -7,7 +7,9 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\CatalogTermTranslator;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use SimpleXMLElement;
 use ZipArchive;
@@ -21,6 +23,8 @@ class ImportInventory extends Command
     private array $categoryCache = [];
 
     private array $translationCache = [];
+
+    private array $translationColumnCache = [];
 
     public function handle(): int
     {
@@ -41,6 +45,15 @@ class ImportInventory extends Command
         $skippedRows = 0;
         $processedRows = 0;
         $limit = max(0, (int) $this->option('limit'));
+        $totalRows = $this->countInventoryRowsForProgress($filePath, $limit);
+        $progressBar = null;
+        $lastVariantParentBySheet = [];
+
+        if (! $this->option('dry-run') && $totalRows > 0) {
+            $progressBar = $this->output->createProgressBar($totalRows);
+            $progressBar->setFormat(' %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%');
+            $progressBar->start();
+        }
 
         foreach ($this->readInventoryRows($filePath) as $row) {
             if ($limit > 0 && $processedRows >= $limit) {
@@ -51,7 +64,27 @@ class ImportInventory extends Command
 
             if ($productData === null) {
                 $skippedRows++;
+                $progressBar?->advance();
+
                 continue;
+            }
+
+            $sheetKey = $row['sheet'];
+
+            if ($this->isStandaloneVariantRow($productData) && isset($lastVariantParentBySheet[$sheetKey])) {
+                $productData = [
+                    ...$lastVariantParentBySheet[$sheetKey],
+                    'variant_name' => $productData['name'],
+                ];
+            }
+
+            if ($this->canBeVariantParent($productData)) {
+                $lastVariantParentBySheet[$sheetKey] = [
+                    'name' => $productData['name'],
+                    'variant_name' => null,
+                    'category_name' => $productData['category_name'],
+                    'slug' => $productData['slug'],
+                ];
             }
 
             $processedRows++;
@@ -59,6 +92,7 @@ class ImportInventory extends Command
             if ($this->option('dry-run')) {
                 $variant = $productData['variant_name'] ? " / {$productData['variant_name']}" : '';
                 $this->line("{$productData['category_name']}: {$productData['name']}{$variant} | qty {$row['quantity']} | EUR {$row['price']}");
+
                 continue;
             }
 
@@ -73,7 +107,9 @@ class ImportInventory extends Command
                 $product = Product::query()->firstOrNew(['slug' => $productData['slug']]);
 
                 $product->name = $productData['name'];
-                $product->name_en = $this->translateCatalogText($productData['name'], true);
+                $this->fillCatalogTranslations($product, [
+                    'name' => $productData['name'],
+                ], true);
 
                 if ($productData['variant_name'] === null) {
                     $product->price = $row['price'];
@@ -82,11 +118,15 @@ class ImportInventory extends Command
                 }
 
                 if (filled($product->description)) {
-                    $product->description_en = $this->translateCatalogText((string) $product->description, false);
+                    $this->fillCatalogTranslations($product, [
+                        'description' => (string) $product->description,
+                    ], false);
                 }
 
                 if (filled($product->extra_information)) {
-                    $product->extra_information_en = $this->translateCatalogText((string) $product->extra_information, false);
+                    $this->fillCatalogTranslations($product, [
+                        'extra_information' => (string) $product->extra_information,
+                    ], false);
                 }
 
                 $product->exists ? $updatedProducts++ : $createdProducts++;
@@ -102,7 +142,9 @@ class ImportInventory extends Command
                         'size' => $productData['variant_name'],
                     ]);
 
-                    $variant->size_en = $this->translateCatalogText($productData['variant_name'], true);
+                    $this->fillCatalogTranslations($variant, [
+                        'size' => $productData['variant_name'],
+                    ], true);
                     $variant->price = $row['price'];
                     $variant->quantity = $row['quantity'];
                     $variant->stock = $row['quantity'] > 0;
@@ -113,6 +155,12 @@ class ImportInventory extends Command
                     $this->syncProductFromVariants($product);
                 }
             });
+
+            $progressBar?->advance();
+        }
+
+        if ($progressBar !== null) {
+            $progressBar->finish();
         }
 
         $this->newLine();
@@ -134,7 +182,7 @@ class ImportInventory extends Command
 
     private function readInventoryRows(string $path): \Generator
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         if ($zip->open($path) !== true) {
             return;
@@ -191,6 +239,26 @@ class ImportInventory extends Command
         $zip->close();
     }
 
+    private function countInventoryRowsForProgress(string $path, int $limit): int
+    {
+        $rows = 0;
+        $processed = 0;
+
+        foreach ($this->readInventoryRows($path) as $row) {
+            if ($limit > 0 && $processed >= $limit) {
+                break;
+            }
+
+            $rows++;
+
+            if ($this->parseProductData($row) !== null) {
+                $processed++;
+            }
+        }
+
+        return $rows;
+    }
+
     private function readSharedStrings(ZipArchive $zip): array
     {
         $index = $zip->locateName('xl/sharedStrings.xml');
@@ -210,6 +278,7 @@ class ImportInventory extends Command
         foreach ($xml->si as $value) {
             if (isset($value->t)) {
                 $strings[] = (string) $value->t;
+
                 continue;
             }
 
@@ -262,7 +331,7 @@ class ImportInventory extends Command
 
             $sheets[] = [
                 'name' => (string) $attributes['name'],
-                'path' => Str::startsWith($target, 'xl/') ? $target : 'xl/' . ltrim($target, '/'),
+                'path' => Str::startsWith($target, 'xl/') ? $target : 'xl/'.ltrim($target, '/'),
             ];
         }
 
@@ -308,6 +377,13 @@ class ImportInventory extends Command
 
     private function splitProductAndVariant(string $name): array
     {
+        if (preg_match('/^(?<product>[RN])\s+(?<variant>.+)$/u', $name, $matches)) {
+            return [
+                $this->cleanProductName($matches['product']),
+                $this->cleanProductName($matches['variant']),
+            ];
+        }
+
         if (preg_match('/^(?<product>ДОРНИК\s+ЦАНГОВ)\s+(?<variant>.+)$/iu', $name, $matches)) {
             return [
                 $this->cleanProductName($matches['product']),
@@ -317,7 +393,7 @@ class ImportInventory extends Command
 
         if (preg_match('/^(?<product>ДОРНИК)\s+(?<variant>ЗА\s+ФРЕЗА)\s+(?<iso>ИСО\s*\d+)$/iu', $name, $matches)) {
             return [
-                $this->cleanProductName($matches['product'] . ' ' . $matches['iso']),
+                $this->cleanProductName($matches['product'].' '.$matches['iso']),
                 $this->cleanProductName($matches['variant']),
             ];
         }
@@ -325,7 +401,7 @@ class ImportInventory extends Command
         if (preg_match('/^(?<product>.+?)\s*-?\s*ф\s*(?<variant>\d+(?:[.,]\d+)?(?:.*)?)$/iu', $name, $matches)) {
             return [
                 $this->cleanProductName($matches['product']),
-                $this->cleanProductName('Ф' . str_replace(',', '.', $matches['variant'])),
+                $this->cleanProductName('Ф'.str_replace(',', '.', $matches['variant'])),
             ];
         }
 
@@ -341,6 +417,17 @@ class ImportInventory extends Command
         }
 
         return [$name, null];
+    }
+
+    private function canBeVariantParent(array $productData): bool
+    {
+        return in_array($productData['name'], ['R', 'N'], true);
+    }
+
+    private function isStandaloneVariantRow(array $productData): bool
+    {
+        return $productData['variant_name'] === null
+            && (bool) preg_match('/^\d+(?:[.,]\d+)?(?:\s+\S+)?$/u', $productData['name']);
     }
 
     private function variantTokenPatterns(): array
@@ -417,34 +504,99 @@ class ImportInventory extends Command
     {
         if (! isset($this->categoryCache[$name])) {
             $category = Category::query()->firstOrCreate(['name' => $name]);
-            $category->name_en = $this->translateCatalogText($name, true);
-            $category->saveQuietly();
+            $this->fillCatalogTranslations($category, [
+                'name' => $name,
+            ], true);
+
+            if ($category->isDirty()) {
+                $category->saveQuietly();
+            }
+
             $this->categoryCache[$name] = $category->id;
         }
 
         return $this->categoryCache[$name];
     }
 
-    private function translateCatalogText(string $value, bool $uppercase = true): string
+    private function fillCatalogTranslations(Model $model, array $sourceFields, bool $uppercase = true): void
+    {
+        if (! (bool) config('catalog_translation.translate_during_import', true)) {
+            return;
+        }
+
+        foreach ($this->translationLocales() as $locale) {
+            foreach ($sourceFields as $field => $value) {
+                $translatedField = "{$field}_{$locale}";
+
+                if (! $this->hasTranslationColumn($model, $translatedField) || filled($model->{$translatedField}) || blank($value)) {
+                    continue;
+                }
+
+                $translated = $this->shouldCopyWithoutTranslation((string) $value)
+                    ? $this->cleanProductName((string) $value)
+                    : $this->translateCatalogText((string) $value, $locale, $uppercase);
+
+                if (filled($translated)) {
+                    $model->{$translatedField} = $translated;
+                }
+            }
+        }
+    }
+
+    private function translationLocales(): array
+    {
+        $locales = config('catalog_translation.locales', ['en']);
+
+        if (is_string($locales)) {
+            $locales = explode(',', $locales);
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($locale): string => strtolower(trim((string) $locale)), (array) $locales),
+            static fn ($locale): bool => $locale !== '' && $locale !== 'bg'
+        )));
+    }
+
+    private function hasTranslationColumn(Model $model, string $column): bool
+    {
+        $table = $model->getTable();
+        $cacheKey = "{$table}.{$column}";
+
+        return $this->translationColumnCache[$cacheKey] ??= Schema::hasColumn($table, $column);
+    }
+
+    private function shouldCopyWithoutTranslation(string $value): bool
     {
         $text = trim($value);
 
         if ($text === '') {
-            return '';
+            return false;
         }
 
-        $cacheKey = ($uppercase ? 'upper:' : 'plain:') . $text;
+        return (bool) preg_match('/^(?:Ф\s*)?\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)+$/iu', $text)
+            || (bool) preg_match('/^(?:Ф\s*)?\d+(?:[.,]\d+)?(?:\s*[xх]\s*\d+(?:[.,]\d+)?)+(?:\s*[xх]\s*\d+(?:[.,]\d+)?)?$/iu', $text)
+            || (bool) preg_match('/^(?:Ф\s*)?\d+(?:[.,]\d+)?\s*(?:mm|мм|cm|см|m|м)$/iu', $text);
+    }
+
+    private function translateCatalogText(string $value, string $locale, bool $uppercase = true): ?string
+    {
+        $text = trim($value);
+
+        if ($text === '') {
+            return null;
+        }
+
+        $cacheKey = "{$locale}:".($uppercase ? 'upper:' : 'plain:').$text;
 
         if (array_key_exists($cacheKey, $this->translationCache)) {
             return $this->translationCache[$cacheKey];
         }
 
-        $translated = app(CatalogTermTranslator::class)->translateOffline($text, 'en', 'bg');
+        $translated = app(CatalogTermTranslator::class)->translateProviderOnly($text, $locale, 'bg');
         $translated = is_string($translated) ? trim($translated) : '';
-        $translated = $translated !== '' ? $translated : $text;
         $translated = $uppercase ? Str::upper($translated) : $translated;
 
-        return $this->translationCache[$cacheKey] = $translated;
+        return $this->translationCache[$cacheKey] = ($translated !== '' ? $translated : null);
     }
 
     private function normalizeCategoryName(string $name): string
@@ -505,12 +657,12 @@ class ImportInventory extends Command
 
     private function slugFor(string $productName, string $categoryName): string
     {
-        $base = Str::slug($categoryName . ' ' . $productName);
+        $base = Str::slug($categoryName.' '.$productName);
 
         if ($base !== '') {
             return $base;
         }
 
-        return 'product-' . md5($categoryName . '|' . $productName);
+        return 'product-'.md5($categoryName.'|'.$productName);
     }
 }

@@ -16,14 +16,17 @@ class Product extends Model
     protected $fillable = [
         'name',
         'name_en',
+        'name_de',
         'price',
         'sale_price',
         'stock',
         'slug',
         'description',
         'description_en',
+        'description_de',
         'extra_information',
         'extra_information_en',
+        'extra_information_de',
         'quantity',
         'weight',
         'width',
@@ -52,7 +55,7 @@ class Product extends Model
     /**
      * Define a many-to-many relationship for categories.
      */
-    public function categories() : BelongsToMany
+    public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class);
     }
@@ -60,7 +63,7 @@ class Product extends Model
     /**
      * Define a many-to-many relationship for related products.
      */
-    public function relatedProducts() : BelongsToMany
+    public function relatedProducts(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'product_related', 'product_id', 'related_product_id');
     }
@@ -76,7 +79,7 @@ class Product extends Model
     /**
      * Define a one-to-many relationship for product images, ordered by sort_order.
      */
-    public function images() : HasMany
+    public function images(): HasMany
     {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
     }
@@ -84,7 +87,7 @@ class Product extends Model
     /**
      * Define a one-to-one relationship for the primary product image, filtered by is_primary flag.
      */
-    public function primaryImage() : HasOne
+    public function primaryImage(): HasOne
     {
         return $this->hasOne(ProductImage::class)->where('is_primary', true);
     }
@@ -113,7 +116,7 @@ class Product extends Model
                         ->where('id', '!=', $product->id ?? 0)
                         ->exists()
                 ) {
-                    $slug = $baseSlug . '-' . ++$count;
+                    $slug = $baseSlug.'-'.++$count;
                 }
 
                 $product->slug = $slug;
@@ -124,7 +127,7 @@ class Product extends Model
     /**
      * Define a one-to-many relationship for product variants.
      */
-    public function variants() : HasMany
+    public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
     }

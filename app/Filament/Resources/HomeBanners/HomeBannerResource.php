@@ -75,6 +75,53 @@ class HomeBannerResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columnSpanFull(),
+
+                Section::make('Преводи')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Section::make('Английски')
+                                ->schema([
+                                    TextInput::make('eyebrow_en')
+                                        ->label('Надзаглавие на английски')
+                                        ->maxLength(255)
+                                        ->required(),
+                                    TextInput::make('title_en')
+                                        ->label('Заглавие на английски')
+                                        ->maxLength(255)
+                                        ->required(),
+                                    Textarea::make('subtitle_en')
+                                        ->label('Подзаглавие на английски')
+                                        ->rows(4)
+                                        ->required(),
+                                    TextInput::make('button_text_en')
+                                        ->label('Текст на бутона на английски')
+                                        ->maxLength(255)
+                                        ->required(),
+                                ]),
+                            Section::make('Немски')
+                                ->schema([
+                                    TextInput::make('eyebrow_de')
+                                        ->label('Надзаглавие на немски')
+                                        ->maxLength(255)
+                                        ->required(),
+                                    TextInput::make('title_de')
+                                        ->label('Заглавие на немски')
+                                        ->maxLength(255)
+                                        ->required(),
+                                    Textarea::make('subtitle_de')
+                                        ->label('Подзаглавие на немски')
+                                        ->rows(4)
+                                        ->required(),
+                                    TextInput::make('button_text_de')
+                                        ->label('Текст на бутона на немски')
+                                        ->maxLength(255)
+                                        ->required(),
+                                ]),
+                        ]),
+                    ])
+                    ->collapsible()
+                    ->columnSpanFull(),
+
                 Section::make('Изображение')
                     ->schema([
                         FileUpload::make('image')

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Support\LocalizedContent;
 use Stripe\StripeClient;
 
 
@@ -19,6 +20,7 @@ class StripeCheckoutService
     public function createSession(Order $order, ?string $sessionId = null)
     {
         $order->loadMissing('items');
+        $locale = LocalizedContent::normalizeLocale($order->locale ?? null);
         $lineItems = $order->items->map(fn ($item) => [
             'price_data' => [
                 'currency' => self::CURRENCY,
@@ -35,7 +37,7 @@ class StripeCheckoutService
                 'price_data' => [
                     'currency' => self::CURRENCY,
                     'product_data' => [
-                        'name' => 'Shipping',
+                        'name' => trans('orders.stripe.shipping', [], $locale),
                     ],
                     'unit_amount' => $this->toMinorUnit((float) $order->shipping_price),
                 ],
@@ -47,7 +49,7 @@ class StripeCheckoutService
 
         return $this->stripe->checkout->sessions->create([
             'mode' => 'payment',
-            'locale' => 'bg',
+            'locale' => $locale,
             'payment_method_types' => ['card'],
             'customer_email' => $order->customer_email,
             'line_items' => $lineItems,

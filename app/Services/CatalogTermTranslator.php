@@ -56,6 +56,46 @@ class CatalogTermTranslator
         return $this->normalizeForLocale($translated !== '' ? $translated : $text, $targetLocale);
     }
 
+    public function translateProviderOnly(mixed $value, string $targetLocale, string $sourceLocale = 'bg'): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $text = trim($value);
+        $targetLocale = strtolower(trim($targetLocale));
+        $sourceLocale = strtolower(trim($sourceLocale));
+
+        if ($text === '' || $targetLocale === '' || $targetLocale === $sourceLocale) {
+            return null;
+        }
+
+        $cacheKey = 'provider-only:v8:'.$this->cacheKey($text, $targetLocale, $sourceLocale);
+        $store = config('catalog_translation.cache_store', config('cache.default'));
+        $ttl = max(60, (int) config('catalog_translation.cache_ttl', 2592000));
+        $cached = Cache::store($store)->get($cacheKey);
+
+        if (is_string($cached)) {
+            return $cached;
+        }
+
+        $translated = $this->translateViaProvider($text, $targetLocale, $sourceLocale);
+
+        if (! is_string($translated) || trim($translated) === '') {
+            return null;
+        }
+
+        $translated = $this->normalizeForLocale($translated, $targetLocale);
+
+        if (! is_string($translated) || trim($translated) === '') {
+            return null;
+        }
+
+        Cache::store($store)->put($cacheKey, $translated, $ttl);
+
+        return $translated;
+    }
+
     public function normalizeForLocale(mixed $value, string $targetLocale): mixed
     {
         if (! is_string($value)) {
@@ -80,59 +120,17 @@ class CatalogTermTranslator
 
     private function translateViaProvider(string $text, string $targetLocale, string $sourceLocale): ?string
     {
-        return match (strtolower((string) config('catalog_translation.provider', 'libretranslate'))) {
+        return match (strtolower((string) config('catalog_translation.provider', 'google'))) {
             'google' => $this->translateViaGoogle($text, $targetLocale, $sourceLocale),
-            'libretranslate' => $this->translateViaLibreTranslate($text, $targetLocale, $sourceLocale),
             default => null,
         };
-    }
-
-    private function translateViaLibreTranslate(string $text, string $targetLocale, string $sourceLocale): ?string
-    {
-        $baseUrl = rtrim((string) config('catalog_translation.libretranslate.base_url', config('catalog_translation.base_url', '')), '/');
-
-        if ($baseUrl === '') {
-            return null;
-        }
-
-        [$preparedText, $restorers] = $this->prepareText($text, $targetLocale);
-
-        try {
-            $response = Http::baseUrl($baseUrl)
-                ->asForm()
-                ->acceptJson()
-                ->timeout((int) config('catalog_translation.timeout', 20))
-                ->post('/translate', array_filter([
-                    'q' => $preparedText,
-                    'source' => $sourceLocale,
-                    'target' => $targetLocale,
-                    'format' => 'text',
-                    'api_key' => blank(config('catalog_translation.libretranslate.api_key', config('catalog_translation.api_key')))
-                        ? null
-                        : (string) config('catalog_translation.libretranslate.api_key', config('catalog_translation.api_key')),
-                ], static fn ($value) => $value !== null && $value !== ''));
-
-            if (! $response->successful()) {
-                return null;
-            }
-
-            $translated = $response->json('translatedText');
-
-            if (! is_string($translated) || trim($translated) === '') {
-                return null;
-            }
-
-            return $this->restorePlaceholders($translated, $restorers);
-        } catch (Throwable) {
-            return null;
-        }
     }
 
     private function translateViaGoogle(string $text, string $targetLocale, string $sourceLocale): ?string
     {
         $baseUrl = rtrim((string) config('catalog_translation.google.base_url', ''), '/');
         $apiKey = trim((string) config('catalog_translation.google.api_key', ''));
-        $endpoint = '/' . ltrim((string) config('catalog_translation.google.endpoint', '/language/translate/v2'), '/');
+        $endpoint = '/'.ltrim((string) config('catalog_translation.google.endpoint', '/language/translate/v2'), '/');
 
         if ($baseUrl === '' || $apiKey === '') {
             return null;
@@ -200,7 +198,7 @@ class CatalogTermTranslator
             }
 
             $text = preg_replace_callback($pattern, function (array $matches) use (&$restorers, $replacement): string {
-                $placeholder = '__CAT_GLOSSARY_' . count($restorers) . '__';
+                $placeholder = '__CAT_GLOSSARY_'.count($restorers).'__';
                 $restorers[$placeholder] = $replacement;
 
                 return $placeholder;
@@ -215,16 +213,16 @@ class CatalogTermTranslator
         $patterns = [
             '~Ø\d+(?:[.,]\d+)?~u',
             '~(?:ISO|ИСО)\s*\d+(?:[A-Z0-9./-]*)~iu',
-            '~\b[A-ZА-Я]{1,4}(?:\.[A-ZА-Я]{1,4}\.?)\b~u',
+            '~\b[A-Z]{1,4}(?:\.[A-Z]{1,4}\.?)\b~u',
             '~\b[A-ZА-Я]{1,4}\d+[A-ZА-Я0-9./-]*\b~u',
-            '~\b[А-Я]{1,3}\b~u',
+            '~\b\d+(?:[.,]\d+)?(?:\s*/\s*\d+(?:[.,]\d+)?)+\b~u',
             '~\b\d+(?:[.,]\d+)?(?:\s*[xх]\s*\d+(?:[.,]\d+)?)+(?:\s*[xх]\s*\d+(?:[.,]\d+)?)?\b~u',
             '~\b\d+(?:[.,]\d+)?\s*(?:mm|мм|cm|см|m|м)\b~iu',
         ];
 
         foreach ($patterns as $pattern) {
             $text = preg_replace_callback($pattern, function (array $matches) use (&$restorers): string {
-                $placeholder = '__CAT_CODE_' . count($restorers) . '__';
+                $placeholder = '__CAT_CODE_'.count($restorers).'__';
                 $restorers[$placeholder] = $this->normalizeTechnicalToken($matches[0]);
 
                 return $placeholder;
@@ -237,6 +235,8 @@ class CatalogTermTranslator
     private function normalizeTechnicalToken(string $token): string
     {
         $map = [
+            'ЦО' => 'CO',
+            'КО' => 'KO',
             'А' => 'A',
             'Б' => 'B',
             'В' => 'V',
@@ -371,6 +371,6 @@ class CatalogTermTranslator
 
     private function cacheKey(string $text, string $targetLocale, string $sourceLocale): string
     {
-        return 'catalog-translation:' . md5($sourceLocale . '|' . $targetLocale . '|' . $text);
+        return 'catalog-translation:'.md5($sourceLocale.'|'.$targetLocale.'|'.$text);
     }
 }

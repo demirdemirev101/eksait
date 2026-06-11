@@ -1,0 +1,93 @@
+<?php
+
+return [
+    'payment_methods' => [
+        'bank_transfer' => 'Bank transfer',
+        'cod' => 'Cash on delivery',
+        'stripe' => 'Card',
+    ],
+    'stripe' => [
+        'shipping' => 'Shipping',
+    ],
+    'errors' => [
+        'stripe_disabled' => 'Stripe payments are currently disabled.',
+        'invalid_variant' => 'Invalid variant for product: :product',
+        'variant_required' => 'Please select a variant for product: :product',
+    ],
+    'mail' => [
+        'common' => [
+            'product' => 'Product',
+            'amount' => 'Amount',
+            'products' => 'Products',
+            'shipping' => 'Shipping',
+            'total' => 'Total',
+            'ordered_products' => 'Ordered products',
+            'quantity_price' => ':quantity pcs. x :price €',
+            'product_fallback' => 'Product',
+        ],
+        'footer' => [
+            'city_country' => 'Stara Zagora, Bulgaria',
+            'phone' => 'Phone',
+        ],
+        'shipping_methods' => [
+            'address' => 'Shipping address',
+            'office' => 'Pickup office',
+            'apm' => 'Parcel locker',
+        ],
+        'shipping' => [
+            'phone' => 'Phone: :phone',
+            'code' => 'Code: :code',
+            'city' => 'City: :city',
+            'missing' => 'No shipping details were provided.',
+        ],
+        'confirmation' => [
+            'title' => 'Order confirmation',
+            'subject' => 'Order confirmation #:order',
+            'hero_title' => 'Thank you for your order, :name!',
+            'hero_text' => 'We received your order #:order and will process it as soon as possible.',
+            'support' => 'If you have any questions or need assistance, contact us and we will be glad to help.',
+            'bank_transfer' => [
+                'section' => 'Bank transfer',
+                'title' => 'Payment details',
+                'recipient' => 'Recipient',
+                'bank' => 'Bank',
+                'amount' => 'Amount',
+                'reference' => 'Reference',
+                'reference_value' => 'Order #:order',
+                'note' => 'Once we confirm the payment, we will prepare and ship your parcel.',
+            ],
+        ],
+        'cancelled' => [
+            'title' => 'Order cancelled',
+            'subject' => 'Cancelled order #:order',
+            'hero_title' => 'Hello, :name.',
+            'hero_text' => 'Your order #:order has been cancelled.',
+            'support' => 'If you have any questions, contact us and we will be glad to help.',
+        ],
+        'return_requested' => [
+            'title' => 'Return requested',
+            'subject' => 'Return requested for order #:order',
+            'hero_title' => 'Hello, :name.',
+            'hero_text' => 'We received a return request for order #:order.',
+            'support' => 'You will receive a separate email with the return shipment number and tracking after Econt confirms the request.',
+        ],
+        'tracking' => [
+            'title_outbound' => 'Shipment sent',
+            'title_return' => 'Return instructions',
+            'subject_outbound' => 'Your order has been shipped',
+            'subject_return' => 'Return instructions for order #:order',
+            'hero_outbound' => 'Your shipment has been created in Econt.',
+            'hero_return' => 'Your return shipment has been created in Econt.',
+            'tracking_number' => 'Tracking number',
+            'section_outbound' => 'Tracking',
+            'section_return' => 'Return',
+            'order' => 'Order',
+            'open_label' => 'Open label',
+            'open_return_label' => 'Open return label',
+            'track_shipment' => 'Track shipment',
+            'track_return' => 'Track return',
+            'note_outbound' => 'Thank you for choosing Excite Company.',
+            'note_return' => 'We prepared the return shipment and you can use the tracking number during the return process.',
+        ],
+    ],
+];

@@ -2,15 +2,19 @@
 
 @php
     $isReturnShipment = $isReturnShipment ?? (($shipment?->direction ?? 'outbound') === 'return');
+    $titleKey = $isReturnShipment ? 'orders.mail.tracking.title_return' : 'orders.mail.tracking.title_outbound';
+    $heroKey = $isReturnShipment ? 'orders.mail.tracking.hero_return' : 'orders.mail.tracking.hero_outbound';
+    $sectionKey = $isReturnShipment ? 'orders.mail.tracking.section_return' : 'orders.mail.tracking.section_outbound';
+    $labelKey = $isReturnShipment ? 'orders.mail.tracking.open_return_label' : 'orders.mail.tracking.open_label';
+    $trackingKey = $isReturnShipment ? 'orders.mail.tracking.track_return' : 'orders.mail.tracking.track_shipment';
+    $noteKey = $isReturnShipment ? 'orders.mail.tracking.note_return' : 'orders.mail.tracking.note_outbound';
 @endphp
 
-@section('title', $isReturnShipment ? 'Инструкции за връщане' : 'Пратката е изпратена')
+@section('title', __($titleKey))
 
 @section('hero')
-    <strong>
-        {{ $isReturnShipment ? 'Обратната ви пратка е създадена в Econt.' : 'Пратката ви е създадена в Econt.' }}
-    </strong><br>
-    Номер на пратка: <strong>{{ $trackingNumber ?? 'N/A' }}</strong>
+    <strong>{{ __($heroKey) }}</strong><br>
+    {{ __('orders.mail.tracking.tracking_number') }}: <strong>{{ $trackingNumber ?? 'N/A' }}</strong>
 @endsection
 
 @section('content')
@@ -21,28 +25,28 @@
         }
     @endphp
 
-    <div class="section-title">{{ $isReturnShipment ? 'Връщане' : 'Проследяване' }}</div>
+    <div class="section-title">{{ __($sectionKey) }}</div>
 
     <div class="info-box">
-        <strong>Номер на пратка:</strong> {{ $trackingNumber ?? 'N/A' }}<br>
+        <strong>{{ __('orders.mail.tracking.tracking_number') }}:</strong> {{ $trackingNumber ?? 'N/A' }}<br>
         @if ($shipment?->order)
-            <strong>Поръчка:</strong> #{{ $shipment->order->id }}
+            <strong>{{ __('orders.mail.tracking.order') }}:</strong> #{{ $shipment->order->id }}
         @endif
     </div>
 
     @if (! empty($labelUrl))
         <p style="margin: 0 0 12px;">
-            <a href="{{ $labelUrl }}" class="button">{{ $isReturnShipment ? 'Отвори етикета за връщане' : 'Отвори етикета' }}</a>
+            <a href="{{ $labelUrl }}" class="button">{{ __($labelKey) }}</a>
         </p>
     @endif
 
     @if (! empty($trackingUrl))
         <p style="margin: 0 0 28px;">
-            <a href="{{ $trackingUrl }}" class="button">{{ $isReturnShipment ? 'Проследи връщането' : 'Проследи пратката' }}</a>
+            <a href="{{ $trackingUrl }}" class="button">{{ __($trackingKey) }}</a>
         </p>
     @endif
 
     <p style="margin: 0; color: #555555; font-size: 14px; line-height: 1.7;">
-        {{ $isReturnShipment ? 'Подготвихме обратната пратка и можеш да използваш номера за проследяване при връщането.' : 'Благодарим, че избрахте Excite Company.' }}
+        {{ __($noteKey) }}
     </p>
 @endsection

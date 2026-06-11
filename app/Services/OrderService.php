@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Setting;
+use App\Support\LocalizedContent;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -22,11 +23,7 @@ class OrderService
     ) {}
 
     /**
-     * Recalculate the total for a given order. This method performs the following steps:
-     *  1. It calculates the subtotal by summing the total of all items associated with the order.
-     *  2. It applies the shipping rules and recalculates the shipping price using the SettingsService.
-     *  3. It saves the updated order totals to the database without triggering model events.
-     *  4. It refreshes the order instance to ensure it has the latest data from the database.
+     * Recalculate subtotal, shipping and total for an existing order.
      */
     public function recalculateTotal(Order $order): void
     {
@@ -40,20 +37,20 @@ class OrderService
     {
         return DB::transaction(function () use ($data) {
             $shippingMethod = $data['shipping_method'] ?? 'address';
+            $locale = LocalizedContent::normalizeLocale($data['locale'] ?? null);
 
             if (($data['payment_method'] ?? null) === 'stripe' && ! Setting::current()->stripe_enabled) {
-                throw new CheckoutException('Stripe payments are currently disabled.', 422);
+                throw new CheckoutException(trans('orders.errors.stripe_disabled', [], $locale), 422);
             }
 
             $user = Auth::user();
 
             $order = Order::create([
-                // If the user is authenticated, associate the order with the user's ID. Otherwise, the order will be created without a user association.
                 'user_id' => $user?->id,
+                'locale' => $locale,
                 'customer_name' => $user?->name ?? $data['customer_name'],
                 'customer_email' => $user?->email ?? $data['customer_email'],
                 'customer_phone' => $user?->phone ?? ($data['customer_phone'] ?? null),
-
                 'shipping_address' => $data['shipping_address'] ?? '',
                 'shipping_city' => $data['shipping_city'],
                 'shipping_postcode' => $data['shipping_postcode'] ?? null,
@@ -71,22 +68,20 @@ class OrderService
                     ? false
                     : (bool) ($data['econt_office_is_aps'] ?? false),
                 'holiday_delivery_day' => $data['holiday_delivery_day'] ?? null,
-
                 'status' => 'pending',
-
                 'subtotal' => 0,
                 'shipping_price' => 0,
                 'total' => 0,
-
                 'payment_method' => $data['payment_method'],
                 'payment_status' => 'pending',
-
                 'notes' => $data['notes'] ?? null,
             ]);
 
             $subtotal = 0;
+
             foreach ($data['items'] as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
+                $localizedProductName = (string) LocalizedContent::localizedValue($product, 'name', $locale);
                 $variantId = $itemData['product_variant_id'] ?? $itemData['variant_id'] ?? null;
                 $variant = null;
 
@@ -96,10 +91,14 @@ class OrderService
                         ->first();
 
                     if (! $variant) {
-                        throw new CheckoutException("Невалиден вариант за продукт: {$product->name}", 422);
+                        throw new CheckoutException(trans('orders.errors.invalid_variant', [
+                            'product' => $localizedProductName,
+                        ], $locale), 422);
                     }
                 } elseif ($product->variants()->exists()) {
-                    throw new CheckoutException("Моля, изберете вариант за продукт: {$product->name}", 422);
+                    throw new CheckoutException(trans('orders.errors.variant_required', [
+                        'product' => $localizedProductName,
+                    ], $locale), 422);
                 }
 
                 if ($variant) {
@@ -108,9 +107,12 @@ class OrderService
                     $this->stockService->reserve($product, (int) $itemData['quantity']);
                 }
 
-                $productName = $variant?->size
-                    ? "{$product->name} - {$variant->size}"
-                    : $product->name;
+                $localizedVariantSize = $variant
+                    ? LocalizedContent::localizedValue($variant, 'size', $locale)
+                    : null;
+                $productName = $localizedVariantSize
+                    ? "{$localizedProductName} - {$localizedVariantSize}"
+                    : $localizedProductName;
                 $price = $variant
                     ? ($variant->sale_price ?? $variant->price)
                     : ($product->sale_price ?? $product->price);
@@ -132,10 +134,8 @@ class OrderService
             $this->settingsService->applyTotals($order);
             $order->save();
 
-            // ⚠️ PaymentService вътре в транзакцията (OK за сега)
             $this->paymentService->handle($order);
 
-            // ✅ ЕДИН event, ясно и чисто
             if ($order->payment_method !== 'stripe') {
                 DB::afterCommit(fn () => OrderPlaced::dispatch(
                     $order->id,
@@ -151,15 +151,6 @@ class OrderService
         });
     }
 
-    /**
-     * Cancel an existing order. This method performs the following steps:
-     *  1. It starts a database transaction to ensure atomicity of the operation.
-     *  2. It updates the order's status to 'cancelled' in the database without triggering model events.
-     *  3. Finally, it completes the transaction, ensuring that the order cancellation is applied atomically to maintain data integrity.
-     *
-     * Note: This method assumes that any necessary stock adjustments or other related operations are handled elsewhere,
-     *  as it only updates the order's status.
-     */
     public function cancel(Order $order): void
     {
         DB::transaction(function () use ($order) {
@@ -201,14 +192,6 @@ class OrderService
         ])->saveQuietly();
     }
 
-    /**
-     * INTERNAL / DEV ONLY
-     * Delte an order along with its associated items. This method performs the following steps:
-     *  1. It starts a database transaction to ensure atomicity of the operation.
-     *  2. It deletes all items associated with the order from the database.
-     *  3. It deletes the order itself from the database.
-     *  4. Finally, it completes the transaction, ensuring that all deletions are applied atomically to maintain data integrity.
-     */
     public function deleteOrderWithItems(Order $order): void
     {
         DB::transaction(function () use ($order) {

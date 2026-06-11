@@ -16,6 +16,7 @@ class Category extends Model
     protected $fillable = [
         'name',
         'name_en',
+        'name_de',
         'slug',
         'parent_id',
     ];
@@ -23,7 +24,7 @@ class Category extends Model
     /**
      * Define a belongs-to relationship to the parent Category model, indicating that each Category may have a single parent Category.
      */
-    public function parent() : BelongsTo
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'parent_id');
     }
@@ -31,7 +32,7 @@ class Category extends Model
     /**
      * Define a has-many relationship to the child Category models, indicating that each Category can have multiple child Categories.
      */
-    public function children() : HasMany
+    public function children(): HasMany
     {
         return $this->hasMany(Category::class, 'parent_id');
     }
@@ -39,7 +40,7 @@ class Category extends Model
     /**
      * Define a many-to-many relationship to the Product model, indicating that each Category can be associated with multiple Products.
      */
-    public function products() : BelongsToMany
+    public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class);
     }
@@ -47,11 +48,11 @@ class Category extends Model
     /**
      * Boot method to handle model events.
      * Automatically generates and sets the slug attribute based on the name attribute whenever the Category is being saved.
-    */
+     */
     public static function booted()
     {
-        static::saving(function (Category $category){
-            if($category->isDirty('name')){
+        static::saving(function (Category $category) {
+            if ($category->isDirty('name')) {
                 $category->slug = Str::slug($category->name);
             }
         });

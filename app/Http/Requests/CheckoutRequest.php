@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\HasCheckoutShippingRules;
 use App\Models\Setting;
+use App\Support\LocalizedContent;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,6 +41,7 @@ class CheckoutRequest extends FormRequest
         return [
             ...$this->checkoutShippingRules(),
             ...$customerRules,
+            'locale' => ['nullable', Rule::in(LocalizedContent::supportedLocales())],
             'payment_method' => ['required', Rule::in($paymentMethods)],
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
