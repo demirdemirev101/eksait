@@ -33,7 +33,6 @@ class HomeBannerController extends Controller
                         'button_text',
                     ]),
                     'button_url' => '/products',
-                    'image' => $banner->image,
                     'image_url' => $banner->image ? Storage::disk('public')->url($banner->image) : null,
                     'sort_order' => $banner->sort_order,
                 ];
@@ -50,7 +49,6 @@ class HomeBannerController extends Controller
             'home_banner_subtitle' => $first['subtitle'] ?? null,
             'home_banner_button_text' => $first['button_text'] ?? null,
             'home_banner_button_url' => '/products',
-            'home_banner_image' => $first['image'] ?? null,
             'home_banner_image_url' => $first['image_url'] ?? null,
         ]);
     }

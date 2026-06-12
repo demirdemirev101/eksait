@@ -1,6 +1,17 @@
 <?php
 
-$isLocalEnvironment = env('APP_ENV', 'production') === 'local';
+$allowedOrigins = collect([
+    env('FRONTEND_URLS'),
+    env('FRONTEND_URL'),
+    env('APP_URL'),
+])
+    ->filter()
+    ->flatMap(static fn (string $origins): array => explode(',', $origins))
+    ->map(static fn (string $origin): string => rtrim(trim($origin), '/'))
+    ->filter()
+    ->unique()
+    ->values()
+    ->all();
 
 return [
 
@@ -21,7 +32,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_filter([env('FRONTEND_URL', env('APP_URL', 'http://localhost'))]),
+    'allowed_origins' => $allowedOrigins,
 
     'allowed_origins_patterns' => [],
 
@@ -31,6 +42,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => env('CORS_SUPPORTS_CREDENTIALS', true),
 
 ];
