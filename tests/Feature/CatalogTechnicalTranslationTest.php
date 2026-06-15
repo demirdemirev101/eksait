@@ -203,7 +203,7 @@ class CatalogTechnicalTranslationTest extends TestCase
 
         $this->assertSame('KECHANA PUCK', $translator->translateOffline('КЕЧАНА ШАЙБА', 'en'));
         $this->assertSame('ABRASIVE SHEET', $translator->translateOffline('ШКУРКА НА ЛИСТ', 'en'));
-        $this->assertSame('DIAMOND DRESSER TSO', $translator->translateOffline('ДИАМАНТЕН ИЗРАВНИТЕЛ ЦО', 'en'));
+        $this->assertSame('DIAMOND DRESSER CO', $translator->translateOffline('ДИАМАНТЕН ИЗРАВНИТЕЛ ЦО', 'en'));
     }
 
     public function test_flat_grinder_terms_prefer_english_over_transliteration(): void

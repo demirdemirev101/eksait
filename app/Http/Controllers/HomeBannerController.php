@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\HomeBanner;
 use App\Support\LocalizedContent;
+use App\Support\PublicStorageUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class HomeBannerController extends Controller
 {
@@ -33,7 +33,7 @@ class HomeBannerController extends Controller
                         'button_text',
                     ]),
                     'button_url' => '/products',
-                    'image_url' => $banner->image ? Storage::disk('public')->url($banner->image) : null,
+                    'image_url' => PublicStorageUrl::for($banner->image),
                     'sort_order' => $banner->sort_order,
                 ];
             })

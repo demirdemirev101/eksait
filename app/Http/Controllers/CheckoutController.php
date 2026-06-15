@@ -426,13 +426,25 @@ class CheckoutController extends Controller
         );
         $validated['locale'] = $locale;
         $validated['session_id'] = $this->frontendCartSessionId($request);
+        $stripeUnavailableMessage = 'Card payments are currently unavailable. Please try again later.';
 
         try {
             $order = $orderService->createFromItems($validated);
 
             if ($order->payment_method === 'stripe') {
-                $stripeCheckoutService = app(StripeCheckoutService::class);
-                $session = $stripeCheckoutService->createSession($order, $validated['session_id'] ?? null);
+                try {
+                    $stripeCheckoutService = app(StripeCheckoutService::class);
+                    $session = $stripeCheckoutService->createSession($order, $validated['session_id'] ?? null);
+                } catch (\Throwable $e) {
+                    Log::error('Stripe checkout session creation failed', [
+                        'order_id' => $order->id,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    $orderService->deleteOrderWithItems($order);
+
+                    throw new CheckoutException($stripeUnavailableMessage, 422);
+                }
 
                 $order->updateQuietly([
                     'stripe_checkout_session_id' => $session->id,

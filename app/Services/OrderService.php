@@ -38,9 +38,14 @@ class OrderService
         return DB::transaction(function () use ($data) {
             $shippingMethod = $data['shipping_method'] ?? 'address';
             $locale = LocalizedContent::normalizeLocale($data['locale'] ?? null);
+            $stripeUnavailableMessage = 'Card payments are currently unavailable. Please try again later.';
 
             if (($data['payment_method'] ?? null) === 'stripe' && ! Setting::current()->stripe_enabled) {
                 throw new CheckoutException(trans('orders.errors.stripe_disabled', [], $locale), 422);
+            }
+
+            if (($data['payment_method'] ?? null) === 'stripe' && blank(config('services.stripe.sk'))) {
+                throw new CheckoutException($stripeUnavailableMessage, 422);
             }
 
             $user = Auth::user();

@@ -33,7 +33,7 @@ class CatalogTermTranslator
                 $translated = $this->applyLegacyFallback($text, $targetLocale);
             }
 
-            return $this->normalizeForLocale($translated !== '' ? $translated : $text, $targetLocale);
+            return $this->finalizeTranslatedText($translated !== '' ? $translated : $text, $targetLocale, $text);
         });
     }
 
@@ -53,7 +53,7 @@ class CatalogTermTranslator
 
         $translated = $this->applyLegacyFallback($text, $targetLocale);
 
-        return $this->normalizeForLocale($translated !== '' ? $translated : $text, $targetLocale);
+        return $this->finalizeTranslatedText($translated !== '' ? $translated : $text, $targetLocale, $text);
     }
 
     public function translateProviderOnly(mixed $value, string $targetLocale, string $sourceLocale = 'bg'): ?string
@@ -76,7 +76,13 @@ class CatalogTermTranslator
         $cached = Cache::store($store)->get($cacheKey);
 
         if (is_string($cached)) {
-            return $cached;
+            $finalized = $this->finalizeTranslatedText($cached, $targetLocale, $text);
+
+            if ($finalized !== $cached) {
+                Cache::store($store)->put($cacheKey, $finalized, $ttl);
+            }
+
+            return $finalized;
         }
 
         $translated = $this->translateViaProvider($text, $targetLocale, $sourceLocale);
@@ -85,7 +91,7 @@ class CatalogTermTranslator
             return null;
         }
 
-        $translated = $this->normalizeForLocale($translated, $targetLocale);
+        $translated = $this->finalizeTranslatedText($translated, $targetLocale, $text);
 
         if (! is_string($translated) || trim($translated) === '') {
             return null;
@@ -108,6 +114,8 @@ class CatalogTermTranslator
         if ($text === '' || $targetLocale === 'bg') {
             return $value;
         }
+
+        $text = $this->normalizeEmbeddedTechnicalCodes($text);
 
         if (! preg_match('/\p{Cyrillic}/u', $text)) {
             return $text;
@@ -299,6 +307,246 @@ class CatalogTermTranslator
         }
 
         return trim((string) preg_replace('/\s+/u', ' ', $translated));
+    }
+
+    private function finalizeTranslatedText(string $text, string $targetLocale, ?string $sourceText = null): string
+    {
+        $translated = trim($text);
+        $translated = $this->correctSourceAwareCatalogTranslations($sourceText, $translated, $targetLocale);
+        $translated = $this->correctKnownCatalogTranslations($translated, $targetLocale);
+        $translated = $this->applyLegacyFallback($translated, $targetLocale);
+
+        return (string) $this->normalizeForLocale($translated, $targetLocale);
+    }
+
+    private function correctSourceAwareCatalogTranslations(?string $sourceText, string $translatedText, string $targetLocale): string
+    {
+        if (! is_string($sourceText) || trim($sourceText) === '') {
+            return $translatedText;
+        }
+
+        $normalizedSource = $this->normalizeSourceTextForCatalogCorrections($sourceText);
+
+        if ($normalizedSource === '') {
+            return $translatedText;
+        }
+
+        $sourceReplacements = match ($targetLocale) {
+            'en' => [
+                'SVREDLO BARZOPROBIVNO' => 'HSS DRILL',
+                'ZENKER KO' => 'COUNTERSINK KO',
+                'ZENKOVKA KO' => 'COUNTERSINK KO',
+                'DIAMANTEN IZRAVNITEL' => 'DIAMOND DRESSER',
+                'DIAMANTEN IZRAVNITEL CO' => 'DIAMOND DRESSER CO',
+                'DIAMANTEN IZRAVNITEL KO' => 'DIAMOND DRESSER KO',
+                'DIAMANTEN SHLAYFGRIFER' => 'DIAMOND MOUNTED POINT',
+                'CHASHKA EB' => 'EB CUP',
+                'SHLAYFGRIFER KECHE' => 'MOUNTED POINT FELT',
+                'LAMELEN SHLAYFGRIFER KECHE' => 'FLAP MOUNTED POINT FELT',
+                'PLANSHAYBA' => 'FACEPLATE',
+                'TSANGA' => 'COLLET',
+                'ZAMBA' => 'PUNCH',
+                'DISK ZA SHLAY' => 'GRINDING DISC',
+                'PLASTINA SANDVIK' => 'SANDVIK INSERT',
+            ],
+            'de' => [
+                'SVREDLO BARZOPROBIVNO' => 'HSS-BOHRER',
+                'ZENKER KO' => 'SENKER KO',
+                'ZENKOVKA KO' => 'SENKER KO',
+                'DIAMANTEN IZRAVNITEL' => 'DIAMANTABRICHTER',
+                'DIAMANTEN IZRAVNITEL CO' => 'DIAMANTABRICHTER CO',
+                'DIAMANTEN IZRAVNITEL KO' => 'DIAMANTABRICHTER KO',
+                'DIAMANTEN SHLAYFGRIFER' => 'DIAMANT-SCHLEIFSTIFT',
+                'CHASHKA EB' => 'EB-BECHER',
+                'SHLAYFGRIFER KECHE' => 'SCHLEIFSTIFT FILZ',
+                'LAMELEN SHLAYFGRIFER KECHE' => 'LAMELLEN-SCHLEIFSTIFT FILZ',
+                'PLANSHAYBA' => 'PLANSCHEIBE',
+                'TSANGA' => 'SPANNZANGE',
+                'ZAMBA' => 'LOCHPUNZE',
+                'DISK OTREZEN' => 'TRENNSCHEIBE',
+                'DISK ZA SHLAY' => 'SCHLEIFSCHEIBE',
+                'PLASTINA SANDVIK' => 'SANDVIK-WENDEPLATTE',
+            ],
+            default => [],
+        };
+
+        return $sourceReplacements[$normalizedSource] ?? $translatedText;
+    }
+
+    private function normalizeSourceTextForCatalogCorrections(string $sourceText): string
+    {
+        $normalized = $this->normalizeForLocale($sourceText, 'en');
+
+        if (! is_string($normalized)) {
+            return '';
+        }
+
+        return strtoupper(trim($normalized));
+    }
+
+    private function correctKnownCatalogTranslations(string $text, string $targetLocale): string
+    {
+        $exactReplacements = match ($targetLocale) {
+            'en' => [
+                'HARDWARE DRIVER' => 'CARBIDE REAMER',
+                'MILLING CUTTER HARDWARE' => 'CARBIDE MILLING CUTTER',
+                'MILLING CUTTER HARDWARE CO' => 'CARBIDE MILLING CUTTER CO',
+                'MILLING CUTTER RADIUS HARDWARE' => 'RADIUS CARBIDE MILLING CUTTER',
+                'MILLING CUTTER RADIUS HARDWARE CO' => 'RADIUS CARBIDE MILLING CUTTER CO',
+                'ZENKER' => 'COUNTERSINK',
+                'ZENKER CO.' => 'COUNTERSINK CO',
+                'ZENKER ZTP CO' => 'COUNTERSINK ZTP CO',
+                'ZENKER ZTP KO' => 'COUNTERSINK ZTP KO',
+                'ZENKER DRUM ZTP' => 'COUNTERSINK ARBOR ZTP',
+                'ZENKER CONE CO' => 'CONICAL COUNTERSINK CO',
+                'ZENKER SM PL S 09' => 'COUNTERSINK SM PL S 09',
+                'ZENKER CON OP 1/10' => 'COUNTERSINK CON OP 1/10',
+                'ZENKER SM S PL CSO' => 'COUNTERSINK SM S PL CO',
+                'ZENKOVKA KO MK1' => 'COUNTERSINK KO MK1',
+                'ZENKOVKA KO MK2' => 'COUNTERSINK KO MK2',
+                'ZENKOVKA KO MK3' => 'COUNTERSINK KO MK3',
+                'ZENKOVKA KO MK4' => 'COUNTERSINK KO MK4',
+                'DRILL TSO' => 'DRILL CO',
+                'DIAMOND LEVELER' => 'DIAMOND DRESSER',
+                'DIAMOND LEVELER C.O.' => 'DIAMOND DRESSER CO',
+                'DISC SOBER' => 'CUT-OFF DISC',
+                'SANDWICH PLATE' => 'SANDVIK INSERT',
+                'ARBOR ISO40 FOR RV ON' => 'ARBOR ISO40 FOR RV',
+                'ARBOR ISO50 FOR RV ON' => 'ARBOR ISO50 FOR RV',
+                'ARBOR ISO30 ON' => 'ARBOR ISO30',
+                'ARBOR ISO40 ON' => 'ARBOR ISO40',
+                'ARBOR ISO50 ON' => 'ARBOR ISO50',
+                'ARBOR ISO50 FOR FU320 ON' => 'ARBOR ISO50 FOR FU320',
+                'ARBOR ISO50 FOR FU320 EXTENDED TO' => 'ARBOR ISO50 FOR FU320 EXTENDED',
+                'ARBOR FOR INST MILLING CUTTER MK2 OF' => 'ARBOR FOR INST MILLING CUTTER MK2',
+                'ARBOR FOR INST MILLING CUTTER MK3 OF' => 'ARBOR FOR INST MILLING CUTTER MK3',
+                'SHEET PEEL' => 'ABRASIVE SHEET',
+                'ROUND SANDWICH' => 'ROUND SANDPAPER',
+                'SANDING PAPER - ROLLER' => 'SANDPAPER ROLL',
+                'GRINDER EN' => 'MOUNTED POINT EN',
+                'SANDWICH GRIPPER ER' => 'MOUNTED POINT ER',
+                'EB GRIPPER' => 'MOUNTED POINT EB',
+                'KECHANA WASHER' => 'KECHANA PUCK',
+                'SHORT BAR WITH MILLING CUTTER' => 'SHORT COLLET WITH MILLING CUTTER',
+                'BAR LONG FOR WOOD' => 'LONG COLLET FOR WOOD',
+                'MILLING CUTTER CARBIDE CUTTER' => 'CARBIDE MILLING CUTTER',
+                'MILLING CUTTER TRISTR TYPE H' => 'MILLING CUTTER TRISTR TYPE N',
+                'TEETH SECT FOR CIRCUS' => 'SECTOR TEETH FOR CIRCULAR CUTTER',
+                'MILLING CUTTER CIRCUS' => 'CIRCULAR MILLING CUTTER',
+                'MILLING CUTTER CIRCUS HARD' => 'CIRCULAR CARBIDE MILLING CUTTER',
+                'MILLING CUTTER CEL CIL T N' => 'FACE CYLINDRICAL MILLING CUTTER T N',
+                'MILLING CUTTER CEL CIL T R' => 'FACE CYLINDRICAL MILLING CUTTER T R',
+                'MILLING CUTTER CEL CIL T T' => 'FACE CYLINDRICAL MILLING CUTTER T T',
+                'MILLING CUTTER 4ERVYAČNA' => 'WORM MILLING CUTTER',
+                'MILLING CUTTER DORNIKOVA FROM' => 'ARBOR MILLING CUTTER OT',
+                'MILLING CUTTER PROTRUSION' => 'CONVEX MILLING CUTTER',
+                'MILLING CUTTER TRISTR R30' => 'MILLING CUTTER TRISTR P30',
+                'MILLING CUTTER 2 HARDWOOD FEATHERS' => 'MILLING CUTTER 2 CARBIDE FLUTES',
+                'MILLING CUTTER 3 HARDWOOD FEATHERS' => 'MILLING CUTTER 3 CARBIDE FLUTES',
+            ],
+            'de' => [
+                'ZENKER' => 'SENKER',
+                'ZENKER CO.' => 'SENKER CO',
+                'ZENKER ZTP CO' => 'SENKER ZTP CO',
+                'ZENKER ZTP KO' => 'SENKER ZTP KO',
+                'ZENKER DRUM ZTP' => 'SENKER DORN ZTP',
+                'ZENKER CONE CO' => 'KONISCHER SENKER CO',
+                'ZENKER SM PL S 09' => 'SENKER SM PL S 09',
+                'ZENKER CON OP 1/10' => 'SENKER CON OP 1/10',
+                'ZENKER SM S PL CSO' => 'SENKER SM S PL CO',
+                'ZENKOVKA KO MK1' => 'SENKER KO MK1',
+                'ZENKOVKA KO MK2' => 'SENKER KO MK2',
+                'ZENKOVKA KO MK3' => 'SENKER KO MK3',
+                'ZENKOVKA KO MK4' => 'SENKER KO MK4',
+                'SPÜLBECKEN CO' => 'SENKER CO',
+                'SPÜLBECKEN CO T N' => 'SENKER CO T N',
+                'BOHRER TSO' => 'BOHRER CO',
+                'GRINDER EN' => 'SCHLEIFSTIFT EN',
+                'SANDWICH GRIPPER ER' => 'SCHLEIFSTIFT ER',
+                'EB GRIPPER' => 'SCHLEIFSTIFT EB',
+                'KECHANA-WASCHMASCHINE' => 'FILZSCHEIBE',
+                'BLECHSANDWICH' => 'SCHLEIFBLATT',
+                'RUNDES SANDWICH' => 'RUNDSCHLEIFPAPIER',
+                'DIAMANT-NIVEAUSCHALTER' => 'DIAMANTABRICHTER',
+                'DIAMOND LEVELER C.O.' => 'DIAMANTABRICHTER CO',
+                'SANDWICHTELLER' => 'SANDVIK-WENDEPLATTE',
+                'KURZER BAR __KATALOGGLOSSAR_1__ __KATALOGGLOSSAR_0__' => 'KURZE SPANNZANGE MIT FRÄSER',
+                'BAR LANG FÜR WOOD' => 'LANGE SPANNZANGE FÜR HOLZ',
+                'FRÄSER HARTMETALLFRÄSER' => 'HARTMETALLFRÄSER',
+                'FRÄSER TRISTR TYPE H' => 'FRÄSER TRISTR TYP N',
+                'DORN ISO40 FÜR RV ON' => 'DORN ISO40 FÜR RV',
+                'DORN ISO50 FÜR RV ON' => 'DORN ISO50 FÜR RV',
+                'DORN ISO30 EIN' => 'DORN ISO30',
+                'DORN ISO40 EIN' => 'DORN ISO40',
+                'DORN ISO50 EIN' => 'DORN ISO50',
+                'DORN ISO50 FÜR FU320 EIN' => 'DORN ISO50 FÜR FU320',
+                'DORN ISO50 FÜR FU320 ERWEITERT AUF' => 'DORN ISO50 FÜR FU320 ERWEITERT',
+                'DORN FÜR INST FRÄSER MK2 ON' => 'DORN FÜR INST FRÄSER MK2',
+                'DORN FÜR INST FRÄSER MK3 ON' => 'DORN FÜR INST FRÄSER MK3',
+                'HARDWARETREIBER' => 'HARTMETALLREIBAHLE',
+                'FRÄSER HARDWARE' => 'HARTMETALLFRÄSER',
+                'FRÄSER HARDWARE CO' => 'HARTMETALLFRÄSER CO',
+                'FRÄSER RADIUS-HARDWARE' => 'RADIUS-HARTMETALLFRÄSER',
+                'FRÄSER RADIUS HARDWARE' => 'RADIUS-HARTMETALLFRÄSER',
+                'FRÄSER RADIUS HARDWARE CO' => 'RADIUS-HARTMETALLFRÄSER CO',
+                'FRÄSER ZIRKUS' => 'KREISFRÄSER',
+                'FRÄSER CIRCUS HARD' => 'KREIS-HARTMETALLFRÄSER',
+                'FRÄSER CEL CIL T N' => 'STIRN-ZYLINDERFRÄSER T N',
+                'FRÄSER CEL CIL T R' => 'STIRN-ZYLINDERFRÄSER T R',
+                'FRÄSER CEL CIL T T' => 'STIRN-ZYLINDERFRÄSER T T',
+                'FRÄSER 4ERVYAČNA' => 'SCHNECKENFRÄSER',
+                'FRÄSER DORNIKOVA VON' => 'DORNFRÄSER OT',
+                'FRÄSER VORSPRUNG' => 'KONVEXFRÄSER',
+                'FRÄSER TRISTR R30' => 'FRÄSER TRISTR P30',
+            ],
+            default => [],
+        };
+
+        $translated = $exactReplacements[$text] ?? $text;
+
+        $patternReplacements = match ($targetLocale) {
+            'en' => [
+                '/\bZENKER\b/u' => 'COUNTERSINK',
+                '/\bZENKOVKA\b/u' => 'COUNTERSINK',
+                '/\bHARDWARE\b/u' => 'CARBIDE',
+                '/\bCIRCUS\b/u' => 'CIRCULAR',
+                '/\bFEATHERS\b/u' => 'FLUTES',
+                '/\bTRISTR R(?=\d+\b)/u' => 'TRISTR P',
+                '/\b4ERVYAČNA\b/u' => 'WORM',
+            ],
+            'de' => [
+                '/\bZENKER\b/u' => 'SENKER',
+                '/\bZENKOVKA\b/u' => 'SENKER',
+                '/\bSPÜLBECKEN\b/u' => 'SENKER',
+                '/\bHARDWARE\b/u' => 'HARTMETALL',
+                '/\bZIRKUS\b/u' => 'KREIS',
+                '/\bCIRCUS\b/u' => 'KREIS',
+                '/\bFEDERN\b/u' => 'SCHNEIDEN',
+                '/\bTRISTR R(?=\d+\b)/u' => 'TRISTR P',
+                '/\b4ERVYAČNA\b/u' => 'SCHNECKEN',
+            ],
+            default => [],
+        };
+
+        foreach ($patternReplacements as $pattern => $replacement) {
+            $translated = preg_replace($pattern, $replacement, $translated) ?? $translated;
+        }
+
+        return trim((string) preg_replace('/\s+/u', ' ', $translated));
+    }
+
+    private function normalizeEmbeddedTechnicalCodes(string $text): string
+    {
+        $replacements = [
+            '/(?<!\pL)ЦО(?!\pL)/u' => 'CO',
+            '/(?<!\pL)КО(?!\pL)/u' => 'KO',
+        ];
+
+        foreach ($replacements as $pattern => $replacement) {
+            $text = preg_replace($pattern, $replacement, $text) ?? $text;
+        }
+
+        return $text;
     }
 
     private function transliterateCyrillicToLatin(string $text): string

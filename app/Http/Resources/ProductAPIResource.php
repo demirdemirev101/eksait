@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Support\LocalizedContent;
+use App\Support\PublicStorageUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
@@ -58,7 +59,7 @@ class ProductAPIResource extends JsonResource
                     'id' => $image->id,
                     'is_primary' => (bool) $image->is_primary,
                     'sort_order' => $image->sort_order,
-                    'url' => asset('storage/' . $image->image_path),
+                    'url' => PublicStorageUrl::for($image->image_path),
                 ];
             }),
         ];  
@@ -104,7 +105,7 @@ class ProductAPIResource extends JsonResource
             )->values(),
             'translations' => LocalizedContent::translations($related, ['name']),
             'image_path' => $imagePath,
-            'image_url' => $imagePath ? asset('storage/' . $imagePath) : null,
+            'image_url' => PublicStorageUrl::for($imagePath),
         ];
     }
 }

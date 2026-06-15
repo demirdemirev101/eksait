@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PublicStorageUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -39,7 +40,7 @@ class ProductImage extends Model
      */
     public function getUrlAttribute()
     {
-        return asset('storage/' . $this->image_path);
+        return PublicStorageUrl::for($this->image_path);
     }
     /**
      * Define a belongs-to relationship to the Product model, indicating that each ProductImage is associated with a single Product.

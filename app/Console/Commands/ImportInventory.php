@@ -16,7 +16,7 @@ use ZipArchive;
 
 class ImportInventory extends Command
 {
-    protected $signature = 'inventory:import {file} {--dry-run} {--limit=0}';
+    protected $signature = 'inventory:import {file} {--dry-run} {--limit=0} {--refresh-translations}';
 
     protected $description = 'Import inventory products from XLSX files';
 
@@ -377,7 +377,11 @@ class ImportInventory extends Command
 
     private function splitProductAndVariant(string $name): array
     {
-        if (preg_match('/^(?<product>[RN])\s+(?<variant>.+)$/u', $name, $matches)) {
+        if (preg_match('/^N\s+.+$/u', $name)) {
+            return [$name, null];
+        }
+
+        if (preg_match('/^(?<product>R)\s+(?<variant>.+)$/u', $name, $matches)) {
             return [
                 $this->cleanProductName($matches['product']),
                 $this->cleanProductName($matches['variant']),
@@ -421,7 +425,7 @@ class ImportInventory extends Command
 
     private function canBeVariantParent(array $productData): bool
     {
-        return in_array($productData['name'], ['R', 'N'], true);
+        return $productData['name'] === 'R';
     }
 
     private function isStandaloneVariantRow(array $productData): bool
@@ -524,11 +528,17 @@ class ImportInventory extends Command
             return;
         }
 
+        $refreshTranslations = (bool) $this->option('refresh-translations');
+
         foreach ($this->translationLocales() as $locale) {
             foreach ($sourceFields as $field => $value) {
                 $translatedField = "{$field}_{$locale}";
 
-                if (! $this->hasTranslationColumn($model, $translatedField) || filled($model->{$translatedField}) || blank($value)) {
+                if (
+                    ! $this->hasTranslationColumn($model, $translatedField)
+                    || (! $refreshTranslations && filled($model->{$translatedField}))
+                    || blank($value)
+                ) {
                     continue;
                 }
 

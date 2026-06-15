@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CatalogLocalizationResponseTest extends TestCase
@@ -61,6 +62,8 @@ class CatalogLocalizationResponseTest extends TestCase
 
     public function test_home_banner_endpoint_returns_only_image_urls_for_banners(): void
     {
+        $expectedImageUrl = route('public-storage.show', ['path' => 'banners/hero-banner.jpg']);
+
         HomeBanner::create([
             'eyebrow' => 'New',
             'title' => 'Banner',
@@ -79,13 +82,27 @@ class CatalogLocalizationResponseTest extends TestCase
         $response->assertJsonPath('items.0.subtitle', 'Subtitle');
         $response->assertJsonPath('items.0.button_text', 'View');
         $response->assertJsonPath('items.0.button_url', '/products');
-        $response->assertJsonPath('items.0.image_url', '/storage/banners/hero-banner.jpg');
+        $response->assertJsonPath('items.0.image_url', $expectedImageUrl);
         $response->assertJsonPath('home_banner_title', 'Banner');
         $response->assertJsonPath('home_banner_button_text', 'View');
         $response->assertJsonPath('home_banner_button_url', '/products');
-        $response->assertJsonPath('home_banner_image_url', '/storage/banners/hero-banner.jpg');
+        $response->assertJsonPath('home_banner_image_url', $expectedImageUrl);
         $response->assertJsonMissingPath('items.0.image');
         $response->assertJsonMissingPath('home_banner_image');
+    }
+
+    public function test_public_storage_route_streams_files_from_public_disk(): void
+    {
+        Storage::disk('public')->put(
+            'banners/test-image.png',
+            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF6kAAAAASUVORK5CYII=')
+        );
+
+        $response = $this->get('/media/banners/test-image.png');
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'image/png');
+        $response->assertHeader('content-disposition', 'inline; filename=test-image.png');
     }
 
     private function bootFakeTranslator(): void
