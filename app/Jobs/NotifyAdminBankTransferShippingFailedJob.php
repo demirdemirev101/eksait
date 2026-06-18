@@ -24,11 +24,11 @@ class NotifyAdminBankTransferShippingFailedJob implements ShouldQueue
     * It includes the order ID and error message in the email content, allowing the admin to quickly identify and address the issue.
     * This job is dispatched from the CalculateBankTransferShippingJob when an exception occurs during shipping cost calculation,
     * ensuring that critical issues are promptly communicated to the admin for resolution.
-    * The email is sent to the address specified in the configuration (defaulting to 'admin@freshwater.bg').   
+    * The email is sent to the address specified in the mail configuration.
     */
     public function handle(): void
     {
-        Mail::to(config('mail.admin_address', 'admin@freshwater.bg'))
+        Mail::to(config('mail.admin_address'))
             ->send(new AdminBankTransferShippingFailedMail($this->orderId, $this->errorMessage));
     }
 }

@@ -33,7 +33,7 @@ class NotifyAdminShipmentFailedJob implements ShouldQueue
             return;
         }
 
-        Mail::to(config('mail.admin_address', 'admin@freshwater.bg'))
+        Mail::to(config('mail.admin_address'))
             ->send(new AdminShipmentFailedMail($shipment));
     }
 }

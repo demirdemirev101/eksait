@@ -28,7 +28,9 @@ class CalculateBankTransferShippingJob implements ShouldQueue
 
     public function __construct(
         public int $orderId
-    ) {}
+    ) {
+        $this->onConnection(config('queue.critical_connection', config('queue.default')));
+    }
     /**
      * Calculates the shipping costs for an order paid via bank transfer. It retrieves the order and its items, calculates the subtotal
      *  and checks if free delivery applies based on the settings.
@@ -65,15 +67,15 @@ class CalculateBankTransferShippingJob implements ShouldQueue
         $order->saveQuietly();
 
         if (! empty($order->customer_email)) {
-            $updated = Order::where('id', $order->id)
-                ->whereNull('order_confirmation_sent_at')
-                ->update([
-                    'order_confirmation_sent_at' => now(),
-                ]);
-
-            if ($updated) {
+            if ($order->order_confirmation_sent_at === null) {
                 Mail::to($order->customer_email)
                     ->send(new OrderConfirmationMail($order->id));
+
+                Order::where('id', $order->id)
+                    ->whereNull('order_confirmation_sent_at')
+                    ->update([
+                        'order_confirmation_sent_at' => now(),
+                    ]);
             }
         }
     }

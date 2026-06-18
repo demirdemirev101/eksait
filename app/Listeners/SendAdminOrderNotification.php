@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Mail;
 
 class SendAdminOrderNotification implements ShouldQueue
 {
+    public function viaConnection(): string
+    {
+        return (string) config('queue.critical_connection', config('queue.default'));
+    }
+
     /**
         * This listener listens for the OrderPlaced event and sends an email notification to the admin with the details of the newly placed order. 
         * It first retrieves the order details using the order ID from the event, then checks if an admin notification has already been sent for this order to avoid duplicate notifications. 
@@ -31,7 +36,7 @@ class SendAdminOrderNotification implements ShouldQueue
             return;
         }
 
-        Mail::to('admin@freshwater.bg')
+        Mail::to(config('mail.admin_address'))
             ->send(new AdminOrderNotificationMail($order->id));
     }
 }

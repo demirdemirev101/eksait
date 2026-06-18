@@ -120,5 +120,5 @@ return [
     | Admin notification email
     |--------------------------------------------------------------------------
     */
-    'admin_address' => env('MAIL_ADMIN_ADDRESS', 'admin@freshwater.bg'),
+    'admin_address' => env('MAIL_ADMIN_ADDRESS', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
 ];

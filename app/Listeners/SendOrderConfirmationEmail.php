@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Mail;
 
 class SendOrderConfirmationEmail implements ShouldQueue
 {
+    public function viaConnection(): string
+    {
+        return (string) config('queue.critical_connection', config('queue.default'));
+    }
+
     /**
      * Sending an order confirmation email to the customer after they have placed an order.
      * This listener listens for the OrderPlaced event and checks if the payment method is not 'bank_transfer' or 'cod' (cash on delivery).
@@ -26,17 +31,17 @@ class SendOrderConfirmationEmail implements ShouldQueue
             return;
         }
 
-        $updated = Order::where('id', $order->id)
-            ->whereNull('order_confirmation_sent_at')
-            ->update([
-                'order_confirmation_sent_at' => now(),
-            ]);
-
-        if (! $updated) {
+        if ($order->order_confirmation_sent_at !== null) {
             return;
         }
 
         Mail::to($order->customer_email)
             ->send(new OrderConfirmationMail($order->id));
+
+        Order::where('id', $order->id)
+            ->whereNull('order_confirmation_sent_at')
+            ->update([
+                'order_confirmation_sent_at' => now(),
+            ]);
     }
 }

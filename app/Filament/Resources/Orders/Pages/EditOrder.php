@@ -51,6 +51,24 @@ class EditOrder extends EditRecord
         return app(ShipmentPollingPolicy::class)->shouldPollShipmentStatus($record);
     }
 
+    public function shouldPollBankTransferConfirmation(): bool
+    {
+        $record = $this->getRecord()->fresh(['shipment', 'returnShipment']);
+
+        if (! $record) {
+            return false;
+        }
+
+        return $record->payment_method === 'bank_transfer'
+            && $record->payment_status !== PaymentStatus::PAID->value
+            && $record->order_confirmation_sent_at === null
+            && in_array($record->status, [
+                OrderStatus::PENDING->value,
+                OrderStatus::PENDING_REVIEW->value,
+                OrderStatus::PROCESSING->value,
+            ], true);
+    }
+
     public function pollShipmentStatus(): void
     {
         if (property_exists($this, 'mountedActions') && ! empty($this->mountedActions)) {
@@ -66,6 +84,53 @@ class EditOrder extends EditRecord
         $changed = app(ShipmentTrackingSyncService::class)->syncShipmentTracking($record);
 
         if ($changed) {
+            $this->refreshUi();
+        }
+    }
+
+    public function pollOrderState(): void
+    {
+        if (property_exists($this, 'mountedActions') && ! empty($this->mountedActions)) {
+            return;
+        }
+
+        $record = $this->getRecord()->fresh(['shipment', 'returnShipment']);
+
+        if (! $record) {
+            return;
+        }
+
+        $wasWaitingForBankTransferEmail = $record->payment_method === 'bank_transfer'
+            && $record->payment_status !== PaymentStatus::PAID->value
+            && $record->order_confirmation_sent_at === null
+            && in_array($record->status, [
+                OrderStatus::PENDING->value,
+                OrderStatus::PENDING_REVIEW->value,
+                OrderStatus::PROCESSING->value,
+            ], true);
+
+        $shipmentChanged = false;
+
+        if (app(ShipmentPollingPolicy::class)->shouldPollShipmentStatus($record)) {
+            $shipmentChanged = app(ShipmentTrackingSyncService::class)->syncShipmentTracking($record);
+        }
+
+        $freshRecord = $this->getRecord()->fresh(['shipment', 'returnShipment']);
+
+        if (! $freshRecord) {
+            return;
+        }
+
+        $isWaitingForBankTransferEmail = $freshRecord->payment_method === 'bank_transfer'
+            && $freshRecord->payment_status !== PaymentStatus::PAID->value
+            && $freshRecord->order_confirmation_sent_at === null
+            && in_array($freshRecord->status, [
+                OrderStatus::PENDING->value,
+                OrderStatus::PENDING_REVIEW->value,
+                OrderStatus::PROCESSING->value,
+            ], true);
+
+        if ($shipmentChanged || $wasWaitingForBankTransferEmail !== $isWaitingForBankTransferEmail) {
             $this->refreshUi();
         }
     }

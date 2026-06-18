@@ -16,6 +16,7 @@ class ConfirmBankTransferPolicy
     {
         return $order->payment_method === 'bank_transfer'
             && $order->payment_status !== PaymentStatus::PAID->value
+            && $order->order_confirmation_sent_at !== null
             && in_array($order->status, [
                 OrderStatus::PENDING->value,
                 OrderStatus::PENDING_REVIEW->value,

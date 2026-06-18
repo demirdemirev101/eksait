@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Critical Queue Connection Name
+    |--------------------------------------------------------------------------
+    |
+    | Use this connection for short, customer-facing jobs that should run
+    | immediately even on hosting environments without a persistent worker.
+    | A good cPanel-friendly option is "deferred".
+    |
+    */
+
+    'critical_connection' => env('QUEUE_CRITICAL_CONNECTION', env('QUEUE_CONNECTION', 'database')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue Connections
     |--------------------------------------------------------------------------
     |
